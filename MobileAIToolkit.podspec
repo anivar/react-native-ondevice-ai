@@ -10,7 +10,9 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  s.platforms    = { :ios => "14.0" }
+  # 15.1 is React Native 0.80's own floor, and this package requires 0.80+.
+  # The previous 14.0 could never have been satisfied.
+  s.platforms    = { :ios => "15.1" }
   s.source       = { :git => "https://github.com/openslm-ai/mobile-ai-toolkit.git", :tag => "#{s.version}" }
 
   s.source_files = [
@@ -18,54 +20,38 @@ Pod::Spec.new do |s|
     "src/specs/*.ts"
   ]
 
-  # New Architecture support
   s.pod_target_xcconfig = {
     "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\"",
-    "CLANG_CXX_LANGUAGE_STANDARD" => "c++17"
+    "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
+    "DEFINES_MODULE" => "YES"
   }
 
-  if ENV['RCT_NEW_ARCH_ENABLED'] == '1'
-    s.compiler_flags = folly_compiler_flags + ' -DRCT_NEW_ARCH_ENABLED=1'
-    s.pod_target_xcconfig['OTHER_CPLUSPLUSFLAGS'] = '-DRCT_NEW_ARCH_ENABLED=1'
-
-    s.dependency "React-Codegen"
-    s.dependency "RCT-Folly"
-    s.dependency "RCTRequired"
-    s.dependency "RCTTypeSafety"
-    s.dependency "ReactCommon/turbomodule/core"
-  else
-    # Old Architecture fallback
-    s.dependency "React-Core"
-  end
-
   # iOS AI frameworks
+  # Only what the sources actually import. VisionKit, CreateML and AppIntents
+  # were linked and never used; WritingTools was linked for an
+  # NSClassFromString lookup, which needs no link at all.
   s.frameworks = [
     "Foundation",
     "Vision",
-    "VisionKit",
     "NaturalLanguage",
     "Speech",
     "AVFoundation",
-    "CoreML",
-    "CreateML"
+    "CoreML"
   ]
 
-  # iOS 18.1+ Apple Intelligence (optional)
-  # FoundationModels is iOS 26+; weak-link so older iOS still loads the dylib.
-  s.weak_frameworks = [
-    "WritingTools",      # iOS 18.1+
-    "AppIntents",        # iOS 18.1+
-    "FoundationModels"   # iOS 26+
-  ]
+  # iOS 26+, and additionally guarded by `#if canImport(FoundationModels)` in
+  # the Swift source. Weak-linked so the dylib still loads on earlier OSes.
+  s.weak_frameworks = ["FoundationModels"]
 
-  s.dependency "React"
-
-  # Don't install the dependencies when we run `pod install` in the old architecture.
-  if ENV['RCT_NEW_ARCH_ENABLED'] == '1'
-    s.dependency "React-Codegen"
-    s.dependency "RCT-Folly"
-    s.dependency "RCTRequired"
-    s.dependency "RCTTypeSafety"
-    s.dependency "ReactCommon/turbomodule/core"
+  # install_modules_dependencies handles React-Core, the codegen output and the
+  # whole TurboModule dependency set for both architectures, and tracks them
+  # across React Native releases. It replaces the hand-maintained list that was
+  # here, which named a nonexistent `React` pod, referenced
+  # `folly_compiler_flags` outside the script context that defines it, and
+  # repeated the new-architecture block twice.
+  if respond_to?(:install_modules_dependencies, true)
+    install_modules_dependencies(s)
+  else
+    s.dependency "React-Core"
   end
 end

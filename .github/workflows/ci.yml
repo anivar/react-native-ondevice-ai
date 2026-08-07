@@ -31,8 +31,110 @@ jobs:
       - name: Test
         run: npm test -- --ci
 
+      # Cheap, and the only automated check of the package's central claim.
+      - name: No network in native sources
+        run: node scripts/check-no-network.mjs
+
       - name: Build
         run: npm run build
+
+  # Compiles the Kotlin. Until this job existed, none of the 800 lines in
+  # AIToolkitTurboModule.kt had ever been through a compiler.
+  #
+  # The host app is generated rather than committed: the library module cannot
+  # build alone (no wrapper in android/, and compileSdkVersion is read from
+  # rootProject.ext). Committing one is the better end state — it stops this
+  # job depending on the upstream template staying compatible — but generating
+  # it first proves the build works before ~30k lines of scaffolding land in
+  # the repo.
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: mobile-ai-toolkit
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Generate host app
+        run: |
+          npx --yes @react-native-community/cli@latest init HostApp \
+            --version 0.80.0 --skip-install --skip-git-init --install-pods false
+
+      - name: Link the library into the host app
+        working-directory: HostApp
+        run: |
+          npm install
+          npm install ../mobile-ai-toolkit
+
+      - name: Assemble
+        working-directory: HostApp/android
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+  # macOS runners are free for public repositories, so the Swift and ObjC++ can
+  # at least be compiled. Compiling is not verifying: Foundation Models needs
+  # Apple-Intelligence hardware no runner has, so its behaviour stays untested
+  # and the package stays on the `next` dist-tag until a real device confirms.
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: mobile-ai-toolkit
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Lint the podspec
+        working-directory: mobile-ai-toolkit
+        run: pod lib lint MobileAIToolkit.podspec --allow-warnings --verbose
+
+      - name: Generate host app
+        run: |
+          npx --yes @react-native-community/cli@latest init HostApp \
+            --version 0.80.0 --skip-install --skip-git-init --install-pods false
+
+      - name: Link the library into the host app
+        working-directory: HostApp
+        run: |
+          npm install
+          npm install ../mobile-ai-toolkit
+
+      - name: Pod install
+        working-directory: HostApp/ios
+        run: RCT_NEW_ARCH_ENABLED=1 pod install
+
+      - name: Build for simulator
+        working-directory: HostApp/ios
+        run: |
+          xcodebuild -workspace HostApp.xcworkspace -scheme HostApp \
+            -sdk iphonesimulator -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            build CODE_SIGNING_ALLOWED=NO | xcpretty && exit ${PIPESTATUS[0]}
+
+      # A green iOS build proves nothing about the generative path if the
+      # compiler never saw it: `#if canImport(FoundationModels)` silently
+      # compiles to an empty branch on an SDK that lacks the framework. Assert
+      # the branch was actually taken.
+      - name: Assert FoundationModels was compiled, not skipped
+        working-directory: mobile-ai-toolkit
+        run: |
+          if ! xcrun --sdk iphonesimulator --show-sdk-version | grep -qE '^(2[6-9]|[3-9][0-9])'; then
+            echo "::error::Runner SDK is older than iOS 26, so every"
+            echo "::error::canImport(FoundationModels) branch compiled to nothing."
+            echo "::error::This build did not check the generative code path."
+            exit 1
+          fi
 
   dependency-review:
     if: github.event_name == 'pull_request'
