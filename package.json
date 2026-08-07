@@ -1,7 +1,7 @@
 {
   "name": "@anivar/mobile-ai-toolkit",
   "version": "2.1.0-rc.5",
-  "description": "On-device AI for React Native. Zero cloud costs. One unified API.",
+  "description": "On-device AI for React Native. Nothing leaves the device. One API shape, per-platform behaviour, fully disclosed.",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -20,7 +20,6 @@
     "ios/",
     "android/",
     "README.md",
-    "SETUP.md",
     "LICENSE",
     "MobileAIToolkit.podspec"
   ],

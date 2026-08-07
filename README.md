@@ -54,7 +54,7 @@
 
 ## Why
 
-A unified surface that hides the iOS/Android split *without* lying about it. Where one platform has a real API and the other doesn't, the call resolves on one side and rejects with `UNSUPPORTED_PLATFORM` / `FEATURE_UNAVAILABLE` on the other — never a polyfill, never a placeholder string. You probe `getDeviceCapabilities()` once, gate UI on the returned feature flags, and write the call site once.
+One API shape, per-platform behaviour, fully disclosed. The two platforms do not offer the same features and this package does not pretend otherwise: where one has a real API and the other doesn't, the call resolves on one side and rejects with a stated reason on the other — never a polyfill, never a placeholder string. You write the call site once and handle a typed rejection, rather than writing two call sites.
 
 ## Install
 
@@ -97,9 +97,11 @@ Every method below maps to a real platform call. ✅ = on-device. 🧪 = on-devi
 | `chat(messages, opts)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Prompt` API (history flattened to single-shot prompt) |
 | `smartReplies(messages)` | ❌ — no public iOS equivalent | ✅ ML Kit `SmartReply` (GA) |
 | `translateText(text, src, tgt)` | ❌ — Translation framework bridge tracked for v2.2 | ✅ ML Kit `Translator` (GA, downloads language pack on first use) |
-| `transcribeAudioFile(path, opts)` | ✅ `SFSpeechRecognizer` with `requiresOnDeviceRecognition = true` | ⚠️ `SpeechRecognizer` with `EXTRA_PREFER_OFFLINE` (OEM-dependent) |
+| `transcribeAudioFile(path, opts)` | ✅ `SFSpeechRecognizer` with `requiresOnDeviceRecognition = true` | ❌ — rejects `FILE_TRANSCRIPTION_UNSUPPORTED`. Android's `SpeechRecognizer` is microphone-only on stock platforms |
 
-`getDeviceCapabilities().features` returns a `Record<MethodName, boolean>` map so you can show or hide UI without try/catch.
+`getDeviceCapabilities().features` returns a `Record<MethodName, boolean>` map, useful for showing or hiding UI. Treat it as a hint and still handle rejections: on Android the generative flags currently reflect whether the ML Kit GenAI classes were compiled into your APK, not whether this device has AICore, so they can read `true` where the call will fail. Honest per-feature availability is the subject of the next minor.
+
+Every rejection is an `AIError` with a `code` you can switch on — `FEATURE_UNAVAILABLE`, `MODEL_NOT_DOWNLOADED`, `MODEL_DOWNLOAD_TIMEOUT`, `INFERENCE_FAILED`, `MODULE_NOT_LINKED` and a few more — plus `platformCode`, the platform's own more specific string. `isTransient(err)` is true when the feature could work later on this device, which is the distinction a retry button needs.
 
 ## Quick start
 

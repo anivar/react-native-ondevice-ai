@@ -106,7 +106,12 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                 putBoolean("extractEntities", true)
                 putBoolean("embedText", false)
                 putBoolean("translate", true)
-                putBoolean("transcribe", SpeechRecognizer.isRecognitionAvailable(reactContext))
+                // False, despite SpeechRecognizer being available: the only
+                // transcription method this module exposes is file-based, and
+                // it rejects on Android. Reporting the microphone recogniser's
+                // availability here told callers a method would work when it
+                // could not.
+                putBoolean("transcribe", false)
                 putBoolean("scanBarcodes", true)
                 putBoolean("labelImage", true)
                 putBoolean("describeImage", hasGenAI)
