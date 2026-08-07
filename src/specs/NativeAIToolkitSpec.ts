@@ -166,4 +166,10 @@ export interface Spec extends TurboModule {
   isPrivateModeEnabled(): boolean;
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('AIToolkitTurboModule');
+/**
+ * `get`, not `getEnforcing`: the enforcing variant throws while this module is
+ * being imported, so on Expo Go, react-native-web or the old architecture the
+ * bundle dies rather than the feature. The null is handled once in `call.ts`,
+ * which raises MODULE_NOT_LINKED at call time instead.
+ */
+export default TurboModuleRegistry.get<Spec>('AIToolkitTurboModule');
