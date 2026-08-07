@@ -64,6 +64,14 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
 
     companion object {
         const val NAME = "AIToolkitTurboModule"
+
+        /**
+         * How long to wait for an on-device model download before giving the
+         * caller an error instead of a promise that never settles. Generous,
+         * because these are real multi-megabyte downloads on real networks;
+         * the point is a bound, not a tight one.
+         */
+        private const val DOWNLOAD_TIMEOUT_MS = 90_000L
     }
 
     override fun getName(): String = NAME
@@ -137,7 +145,11 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                 }
                 runEntityExtraction(text) { entitiesArray, err ->
                     if (err != null) {
-                        result.putArray("entities", Arguments.createArray())
+                        // Omit the field rather than returning an empty array.
+                        // A failed model download and "this text has no
+                        // entities" produced identical results before, so a
+                        // caller could not tell them apart or retry.
+                        result.putBoolean("degraded", true)
                     } else {
                         result.putArray("entities", entitiesArray)
                     }
@@ -160,6 +172,22 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
         val extractor = EntityExtraction.getClient(
             EntityExtractorOptions.Builder(EntityExtractorOptions.ENGLISH).build()
         )
+        // Same stall risk as translate: this downloads a model on first use and
+        // a download waiting on the network never fails, it waits. The callback
+        // fires exactly once, whichever of the three paths gets there first.
+        val settled = java.util.concurrent.atomic.AtomicBoolean(false)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (settled.compareAndSet(false, true)) {
+                callback(
+                    Arguments.createArray(),
+                    java.util.concurrent.TimeoutException(
+                        "The entity-extraction model did not finish downloading within " +
+                            "${DOWNLOAD_TIMEOUT_MS / 1000}s."
+                    )
+                )
+            }
+        }, DOWNLOAD_TIMEOUT_MS)
+
         extractor.downloadModelIfNeeded()
             .continueWithTask { extractor.annotate(EntityExtractionParams.Builder(text).build()) }
             .addOnSuccessListener { annotations ->
@@ -177,9 +205,11 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                         })
                     }
                 }
-                callback(arr, null)
+                if (settled.compareAndSet(false, true)) callback(arr, null)
             }
-            .addOnFailureListener { callback(Arguments.createArray(), it) }
+            .addOnFailureListener {
+                if (settled.compareAndSet(false, true)) callback(Arguments.createArray(), it)
+            }
     }
 
     private fun mapEntityType(typeId: Int): String = when (typeId) {
@@ -214,23 +244,38 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
             }
 
             val tasks = mutableListOf<() -> Unit>()
-            var pending = 0
+            // ML Kit completion listeners run on the main looper by default but
+            // are not guaranteed to, and a plain `var` decremented from more
+            // than one of them can lose a write — leaving the promise pending
+            // forever, or hitting zero twice and resolving twice. Both are
+            // cheap to rule out.
+            val pending = java.util.concurrent.atomic.AtomicInteger(0)
+            val degraded = java.util.concurrent.atomic.AtomicBoolean(false)
             val complete = {
-                pending -= 1
-                if (pending == 0) promise.resolve(result)
+                if (pending.decrementAndGet() == 0) {
+                    result.putBoolean("degraded", degraded.get())
+                    promise.resolve(result)
+                }
+            }
+            // A sub-analysis that fails still lets the others through, but the
+            // caller is told, rather than reading an empty `objects` array as
+            // "no objects in this image".
+            val failed = {
+                degraded.set(true)
+                complete()
             }
 
             if (options.takeIf { it.hasKey("extractText") }?.getBoolean("extractText") == true) {
-                pending++
+                pending.incrementAndGet()
                 tasks += {
                     TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                         .process(image)
                         .addOnSuccessListener { text -> result.putString("text", text.text); complete() }
-                        .addOnFailureListener { complete() }
+                        .addOnFailureListener { failed() }
                 }
             }
             if (options.takeIf { it.hasKey("detectObjects") }?.getBoolean("detectObjects") == true) {
-                pending++
+                pending.incrementAndGet()
                 tasks += {
                     val opts = ObjectDetectorOptions.Builder()
                         .setDetectorMode(ObjectDetectorOptions.SINGLE_IMAGE_MODE)
@@ -256,11 +301,11 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                             result.putArray("objects", arr)
                             complete()
                         }
-                        .addOnFailureListener { complete() }
+                        .addOnFailureListener { failed() }
                 }
             }
             if (options.takeIf { it.hasKey("detectFaces") }?.getBoolean("detectFaces") == true) {
-                pending++
+                pending.incrementAndGet()
                 tasks += {
                     val opts = FaceDetectorOptions.Builder()
                         .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
@@ -281,7 +326,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                             result.putArray("faces", arr)
                             complete()
                         }
-                        .addOnFailureListener { complete() }
+                        .addOnFailureListener { failed() }
                 }
             }
 
@@ -454,17 +499,60 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
             .setTargetLanguage(tgt)
             .build()
         val translator = Translation.getClient(opts)
-        val conditions = DownloadConditions.Builder().requireWifi().build()
+        // No requireWifi(). ML Kit does not fail a download whose conditions are
+        // unmet — it waits for them. On cellular the task therefore never
+        // completes, and neither listener below ever runs, so the JS promise
+        // stays pending forever with no error and no timeout. A caller who
+        // wants a wifi-only policy can check connectivity before calling; a
+        // caller who does not want one had no way to opt out.
+        val conditions = DownloadConditions.Builder().build()
+        val settled = rejectIfDownloadStalls(promise) { translator.close() }
         translator.downloadModelIfNeeded(conditions)
             .continueWithTask { translator.translate(text) }
             .addOnSuccessListener { translated ->
-                promise.resolve(translated)
-                translator.close()
+                if (settled.compareAndSet(false, true)) {
+                    promise.resolve(translated)
+                    translator.close()
+                }
             }
             .addOnFailureListener {
-                promise.reject("TRANSLATE_ERROR", it.message, it)
-                translator.close()
+                if (settled.compareAndSet(false, true)) {
+                    promise.reject("TRANSLATE_ERROR", it.message, it)
+                    translator.close()
+                }
             }
+    }
+
+    /**
+     * Arms a timeout that rejects MODEL_DOWNLOAD_TIMEOUT, and returns the flag
+     * that decides who settles the promise first.
+     *
+     * Model downloads are the one place in this module where a task can stall
+     * indefinitely: they wait on the network and on Play Services, and a
+     * stalled task never invokes a failure listener. Without this, a translate
+     * on a flaky connection is indistinguishable from a hung app.
+     *
+     * The caller must guard its own listeners with the returned flag, so a
+     * download that finishes after the timeout does not settle the promise a
+     * second time.
+     */
+    private fun rejectIfDownloadStalls(
+        promise: Promise,
+        onTimeout: () -> Unit = {}
+    ): java.util.concurrent.atomic.AtomicBoolean {
+        val settled = java.util.concurrent.atomic.AtomicBoolean(false)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (settled.compareAndSet(false, true)) {
+                promise.reject(
+                    "MODEL_DOWNLOAD_TIMEOUT",
+                    "The on-device model did not finish downloading within " +
+                        "${DOWNLOAD_TIMEOUT_MS / 1000}s. It may still be downloading in " +
+                        "the background; retrying later often succeeds."
+                )
+                onTimeout()
+            }
+        }, DOWNLOAD_TIMEOUT_MS)
+        return settled
     }
 
     // ---- Speech ----

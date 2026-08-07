@@ -61,8 +61,15 @@ export interface Entity {
 export interface TextAnalysis {
   language: string;
   sentiment?: number;
+  /**
+   * Absent — not empty — when entity extraction was requested and failed.
+   * An empty array means the text genuinely had no entities; those two are
+   * different answers and used to be indistinguishable.
+   */
   entities?: Entity[];
   confidence: number;
+  /** True when part of the analysis failed and its field was omitted. */
+  degraded?: boolean;
 }
 
 export interface ImageAnalysisOptions {
@@ -81,6 +88,12 @@ export interface ImageAnalysis {
   faces: Array<{
     bounds: { x: number; y: number; width: number; height: number };
   }>;
+  /**
+   * True when one of the requested sub-analyses (text, objects, faces) failed.
+   * Its field is then empty for want of a result, not because the image had
+   * nothing in it.
+   */
+  degraded?: boolean;
 }
 
 export interface ProofreadResult {
