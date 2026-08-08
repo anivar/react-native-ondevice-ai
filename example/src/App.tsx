@@ -11,6 +11,15 @@
  * whether it was degraded, so a fallback is never mistaken for a model.
  */
 
+import {
+  type CallExplanation,
+  type DeviceCapabilities,
+  explainCall,
+  getDeviceCapabilities,
+  isAIError,
+  type SummarizeResult,
+  summarize,
+} from '@anivar/mobile-ai-toolkit';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -22,15 +31,6 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
-import {
-  type CallExplanation,
-  type DeviceCapabilities,
-  explainCall,
-  getDeviceCapabilities,
-  isAIError,
-  summarize,
-  type SummarizeResult,
-} from '@anivar/mobile-ai-toolkit';
 import { dark, light, stateColor, type Theme } from './theme';
 
 const ARTICLE = [
@@ -111,9 +111,8 @@ export default function App() {
 
         <Text style={s.h2}>What this device can do</Text>
         <Text style={s.note}>
-          Straight from ML Kit's checkFeatureStatus() and Apple's
-          SystemLanguageModel.availability — not a guess from which classes were
-          compiled in.
+          Straight from ML Kit's checkFeatureStatus() and Apple's SystemLanguageModel.availability —
+          not a guess from which classes were compiled in.
         </Text>
 
         <View style={s.card}>
@@ -137,9 +136,9 @@ export default function App() {
 
         <Text style={s.h2}>Summarize</Text>
         <Text style={s.note}>
-          With no generative model on this device, the call falls back to a
-          bundled extractive summariser on Android and rejects honestly on iOS.
-          Either way the result says which route ran.
+          With no generative model on this device, the call falls back to a bundled extractive
+          summariser on Android and rejects honestly on iOS. Either way the result says which route
+          ran.
         </Text>
 
         <TouchableOpacity style={s.button} onPress={runSummarize} disabled={busy}>

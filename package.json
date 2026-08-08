@@ -30,9 +30,9 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "typecheck:example": "tsc --noEmit -p example/tsconfig.json",
-    "lint": "biome check src/",
-    "lint:fix": "biome check --write src/",
-    "format": "biome format --write src/",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
     "check": "biome check .",
     "prepublishOnly": "npm run check && npm run build"
   },

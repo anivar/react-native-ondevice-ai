@@ -12,8 +12,6 @@
     "android": {
       "package": "ai.openslm.mobileaitoolkit.example"
     },
-    "plugins": [
-      "@anivar/mobile-ai-toolkit"
-    ]
+    "plugins": ["@anivar/mobile-ai-toolkit"]
   }
 }

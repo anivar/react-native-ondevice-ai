@@ -39,12 +39,8 @@ function loadConfigPlugins() {
   }
 }
 
-const {
-  createRunOncePlugin,
-  withInfoPlist,
-  withGradleProperties,
-  withPodfileProperties,
-} = loadConfigPlugins();
+const { createRunOncePlugin, withInfoPlist, withGradleProperties, withPodfileProperties } =
+  loadConfigPlugins();
 
 const pkg = require('./package.json');
 
