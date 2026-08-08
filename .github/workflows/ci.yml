@@ -99,10 +99,14 @@ jobs:
         with:
           node-version: 24
 
-      - name: Lint the podspec
-        working-directory: mobile-ai-toolkit
-        run: pod lib lint MobileAIToolkit.podspec --allow-warnings --verbose
-
+      # No `pod lib lint`. It builds the pod in isolation, where React's headers
+      # do not exist, so a React Native TurboModule cannot pass it — the first
+      # run failed on `'React/RCTBridgeModule.h' file not found` before the real
+      # build could start. The meaningful check is compiling the pod inside a
+      # host app that has React in its Podfile, which is what this job does
+      # below. That covers everything the lint would have caught about the
+      # podspec: a bad dependency, a wrong deployment target, or a source_files
+      # glob that misses a file all fail `pod install` or the build.
       - name: Generate host app
         run: |
           npx --yes @react-native-community/cli@latest init HostApp \
