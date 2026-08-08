@@ -11,7 +11,8 @@
       "import": "./lib/index.js",
       "require": "./lib/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./app.plugin.js": "./app.plugin.js"
   },
   "sideEffects": false,
   "files": [
