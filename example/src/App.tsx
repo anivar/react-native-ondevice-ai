@@ -109,9 +109,14 @@ export default function App() {
           {capabilities.hasNeuralEngine ? ' - neural engine' : ''}
         </Text>
         <Text style={styles.capsLine}>On-device GenAI: {onDevice ? 'yes' : 'no'}</Text>
-        <Text style={styles.capsLine}>Chat: {capabilities.features.chat ? 'yes' : 'no'}</Text>
         <Text style={styles.capsLine}>
-          Smart replies: {capabilities.features.smartReplies ? 'yes' : 'no'}
+          Chat: {capabilities.availability.chat.state}
+          {capabilities.availability.chat.reason
+            ? ` (${capabilities.availability.chat.reason})`
+            : ''}
+        </Text>
+        <Text style={styles.capsLine}>
+          Smart replies: {capabilities.availability.smartReplies.state}
         </Text>
       </View>
     );

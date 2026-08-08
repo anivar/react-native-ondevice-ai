@@ -10,7 +10,6 @@
  */
 
 import type {
-  DeviceCapabilities,
   FeatureAvailability,
   FeatureAvailabilityMap,
   Spec,
@@ -63,11 +62,6 @@ const native: Spec = {
     hasOnDeviceSpeech: true,
     supportedLanguages: ['en', 'es'],
     availability,
-    // Derived exactly as native derives it, so the test cannot drift from the
-    // rule it is documenting.
-    features: Object.fromEntries(
-      Object.entries(availability).map(([k, v]) => [k, v.state !== 'unavailable'])
-    ) as DeviceCapabilities['features'],
   })),
   analyzeText: jest.fn(async () => ({
     language: 'en',
@@ -158,15 +152,6 @@ describe('mobile-ai-toolkit', () => {
     expect(caps.availability.translate.reason).toBe('no-platform-api');
   });
 
-  test('the deprecated features map cannot express the difference', async () => {
-    const caps = await getDeviceCapabilities();
-    // Documenting the flaw rather than pretending it is gone: a downloading
-    // model still reads true here, which is why `features` cannot answer
-    // "will this call succeed".
-    expect(caps.features.summarize).toBe(true);
-    expect(caps.availability.summarize.state).not.toBe('available');
-  });
-
   test('explainCall answers without running inference', async () => {
     const plan = await explainCall('summarize');
     expect(plan.willSucceed).toBe(false);
@@ -188,12 +173,10 @@ describe('mobile-ai-toolkit', () => {
     expect(all.every((p) => typeof p.summary === 'string')).toBe(true);
   });
 
-  test('getDeviceCapabilities returns shape with features map', async () => {
+  test('getDeviceCapabilities returns the availability map', async () => {
     const caps = await getDeviceCapabilities();
     expect(caps.platform).toBeDefined();
-    expect(caps.features).toBeDefined();
-    expect(typeof caps.features.analyzeText).toBe('boolean');
-    expect(typeof caps.features.summarize).toBe('boolean');
+    expect(caps.availability.analyzeText.state).toBe('available');
     expect(Array.isArray(caps.supportedLanguages)).toBe(true);
   });
 

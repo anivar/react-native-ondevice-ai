@@ -10,13 +10,13 @@
   },
   "dependencies": {
     "react": "^19.0.0",
-    "react-native": "^0.80.0",
+    "react-native": "^0.86.2",
     "@anivar/mobile-ai-toolkit": "file:.."
   },
   "devDependencies": {
-    "@react-native/babel-preset": "^0.80.0",
-    "@react-native/metro-config": "^0.80.0",
-    "@react-native/typescript-config": "^0.80.0",
+    "@react-native/babel-preset": "^0.86.2",
+    "@react-native/metro-config": "^0.86.2",
+    "@react-native/typescript-config": "^0.86.2",
     "@types/react": "^19.0.0",
     "typescript": "^6.0.3"
   }

@@ -135,9 +135,6 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                 })
 
                 putMap("availability", availability)
-                // Deprecated, derived, and kept because it is in the documented
-                // Quick Start. Anything not flatly unavailable reads true.
-                putMap("features", deriveFeatureFlags(availability))
             }
             promise.resolve(capabilities)
         }
@@ -173,16 +170,6 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
         merge(this@copy)
     }
 
-    private fun deriveFeatureFlags(availability: WritableMap): WritableMap {
-        val flags = Arguments.createMap()
-        val it = availability.keySetIterator()
-        while (it.hasNextKey()) {
-            val key = it.nextKey()
-            val state = availability.getMap(key)?.getString("state")
-            flags.putBoolean(key, state != "unavailable")
-        }
-        return flags
-    }
 
     /**
      * The honest GenAI answer, replacing a `Class.forName` check.
@@ -767,7 +754,17 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
     override fun transcribeAudioFile(filePath: String, options: ReadableMap, promise: Promise) {
         // Android's SpeechRecognizer is microphone-only on stock platforms; the
         // EXTRA_AUDIO_SOURCE path for file input is OEM-gated and not reliably
-        // available across devices. Reject explicitly so callers can fall back
+        // available across devices.
+        //
+        // There is now a real path: com.google.mlkit:genai-speech-recognition
+        // takes a ParcelFileDescriptor via AudioSource.fromPfd(), which is
+        // genuine file transcription. It is not adopted here yet — it is
+        // 1.0.0-alpha1, needs API 31+ for its Basic mode, and requires 16-bit
+        // PCM mono at 16 kHz, so it means owning a decode step rather than
+        // accepting any file path this method's signature implies. Worth
+        // revisiting when it reaches beta.
+        //
+        // Reject explicitly so callers can fall back
         // to a TFLite/whisper-on-device pipeline rather than silently
         // transcribing the live microphone (which the previous implementation
         // did, contradicting the filePath contract).

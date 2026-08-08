@@ -80,14 +80,9 @@ RCT_EXPORT_METHOD(getDeviceCapabilities:(RCTPromiseResolveBlock)resolve
              @"detail": genDetail, @"requiresNetwork": @NO };
 
     // `@available` is only valid as an if-condition, not inside an expression.
-    NSDictionary *embed = no(@"os-too-old", @"NLContextualEmbedding requires iOS 17 or later.");
-    if (@available(iOS 17.0, *)) {
-        embed = ok();
-    }
-    NSDictionary *segment = no(@"os-too-old", @"Person segmentation requires iOS 15 or later.");
-    if (@available(iOS 15.0, *)) {
-        segment = ok();
-    }
+    // embedText (iOS 17+) and segmentPerson (iOS 15+) are both below the 17.0
+    // deployment target, so they are simply present. The guards and their
+    // unreachable `unavailable` branches are gone.
     NSDictionary *transcribe = hasOnDeviceSpeech
         ? ok()
         : no(@"hardware-ineligible",
@@ -100,8 +95,8 @@ RCT_EXPORT_METHOD(getDeviceCapabilities:(RCTPromiseResolveBlock)resolve
         @"extractEntities": ok(),
         @"scanBarcodes": ok(),
         @"labelImage": ok(),
-        @"segmentPerson": segment,
-        @"embedText": embed,
+        @"segmentPerson": ok(),
+        @"embedText": ok(),
         @"transcribe": transcribe,
         @"summarize": gen,
         @"rewrite": gen,
@@ -116,13 +111,6 @@ RCT_EXPORT_METHOD(getDeviceCapabilities:(RCTPromiseResolveBlock)resolve
     };
     capabilities[@"availability"] = availability;
 
-    // Deprecated, derived. `downloading` and `downloadable` both read YES here,
-    // which is exactly why a boolean could not answer "will this call work".
-    NSMutableDictionary *features = [NSMutableDictionary dictionaryWithCapacity:availability.count];
-    [availability enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSDictionary *value, BOOL *stop) {
-        features[key] = @(![value[@"state"] isEqualToString:@"unavailable"]);
-    }];
-    capabilities[@"features"] = features;
 
     resolve(capabilities);
 }
@@ -145,37 +133,34 @@ RCT_EXPORT_METHOD(analyzeText:(NSString *)text
         reject(@"INVALID_INPUT", @"Text cannot be empty", nil);
         return;
     }
-    if (@available(iOS 13.0, *)) {
-        NSMutableDictionary *result = [NSMutableDictionary dictionary];
+    NSMutableDictionary *result = [NSMutableDictionary dictionary];
 
-        NLLanguageRecognizer *recognizer = [[NLLanguageRecognizer alloc] init];
-        [recognizer processString:text];
-        NLLanguage dominantLanguage = [recognizer dominantLanguage];
-        result[@"language"] = dominantLanguage ?: @"unknown";
-        NSDictionary<NLLanguage, NSNumber *> *hypotheses = [recognizer languageHypothesesWithMaximum:1];
-        result[@"confidence"] = hypotheses[dominantLanguage] ?: @0.0;
+    NLLanguageRecognizer *recognizer = [[NLLanguageRecognizer alloc] init];
+    [recognizer processString:text];
+    NLLanguage dominantLanguage = [recognizer dominantLanguage];
+    result[@"language"] = dominantLanguage ?: @"unknown";
+    NSDictionary<NLLanguage, NSNumber *> *hypotheses = [recognizer languageHypothesesWithMaximum:1];
+    result[@"confidence"] = hypotheses[dominantLanguage] ?: @0.0;
 
-        if ([options[@"includeSentiment"] boolValue]) {
-            NLTagger *tagger = [[NLTagger alloc] initWithTagSchemes:@[NLTagSchemeSentimentScore]];
-            tagger.string = text;
-            NLTag sentimentTag = [tagger tagAtIndex:0
-                                              unit:NLTokenUnitDocument
-                                            scheme:NLTagSchemeSentimentScore
-                                        tokenRange:nil];
-            result[@"sentiment"] = sentimentTag ? @([sentimentTag doubleValue]) : @0.0;
-        }
-
-        if ([options[@"includeEntities"] boolValue]) {
-            result[@"entities"] = [self extractEntitiesSync:text];
-        }
-
-        resolve(result);
-    } else {
-        reject(@"UNSUPPORTED_OS", @"Requires iOS 13.0+", nil);
+    if ([options[@"includeSentiment"] boolValue]) {
+        NLTagger *tagger = [[NLTagger alloc] initWithTagSchemes:@[NLTagSchemeSentimentScore]];
+        tagger.string = text;
+        NLTag sentimentTag = [tagger tagAtIndex:0
+                                          unit:NLTokenUnitDocument
+                                        scheme:NLTagSchemeSentimentScore
+                                    tokenRange:nil];
+        result[@"sentiment"] = sentimentTag ? @([sentimentTag doubleValue]) : @0.0;
     }
+
+    if ([options[@"includeEntities"] boolValue]) {
+        result[@"entities"] = [self extractEntitiesSync:text];
+    }
+
+    resolve(result);
+    
 }
 
-- (NSArray *)extractEntitiesSync:(NSString *)text API_AVAILABLE(ios(13.0)) {
+- (NSArray *)extractEntitiesSync:(NSString *)text {
     NLTagger *tagger = [[NLTagger alloc] initWithTagSchemes:@[NLTagSchemeNameType]];
     tagger.string = text;
     NSMutableArray *entities = [NSMutableArray array];
@@ -204,11 +189,8 @@ RCT_EXPORT_METHOD(extractEntities:(NSString *)text
                  resolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
-    if (@available(iOS 13.0, *)) {
-        resolve([self extractEntitiesSync:text]);
-    } else {
-        reject(@"UNSUPPORTED_OS", @"Requires iOS 13.0+", nil);
-    }
+    resolve([self extractEntitiesSync:text]);
+    
 }
 
 RCT_EXPORT_METHOD(identifyLanguage:(NSString *)text
@@ -287,29 +269,28 @@ RCT_EXPORT_METHOD(analyzeImage:(NSString *)imageBase64
     }
 
     if ([options[@"detectObjects"] boolValue]) {
-        if (@available(iOS 17.0, *)) {
-            dispatch_group_enter(group);
-            VNGenerateForegroundInstanceMaskRequest *maskRequest = [[VNGenerateForegroundInstanceMaskRequest alloc] initWithCompletionHandler:^(VNRequest *req, NSError *error) {
-                if (!error) {
-                    NSMutableArray *objects = [NSMutableArray array];
-                    for (VNInstanceMaskObservation *obs in req.results) {
-                        [objects addObject:@{
-                            @"label": @"foreground",
-                            @"confidence": @(obs.confidence),
-                            @"bounds": @{
-                                @"x": @(obs.boundingBox.origin.x * image.size.width),
-                                @"y": @(obs.boundingBox.origin.y * image.size.height),
-                                @"width": @(obs.boundingBox.size.width * image.size.width),
-                                @"height": @(obs.boundingBox.size.height * image.size.height)
-                            }
-                        }];
-                    }
-                    result[@"objects"] = objects;
+        dispatch_group_enter(group);
+        VNGenerateForegroundInstanceMaskRequest *maskRequest = [[VNGenerateForegroundInstanceMaskRequest alloc] initWithCompletionHandler:^(VNRequest *req, NSError *error) {
+            if (!error) {
+                NSMutableArray *objects = [NSMutableArray array];
+                for (VNInstanceMaskObservation *obs in req.results) {
+                    [objects addObject:@{
+                        @"label": @"foreground",
+                        @"confidence": @(obs.confidence),
+                        @"bounds": @{
+                            @"x": @(obs.boundingBox.origin.x * image.size.width),
+                            @"y": @(obs.boundingBox.origin.y * image.size.height),
+                            @"width": @(obs.boundingBox.size.width * image.size.width),
+                            @"height": @(obs.boundingBox.size.height * image.size.height)
+                        }
+                    }];
                 }
-                dispatch_group_leave(group);
-            }];
-            [requests addObject:maskRequest];
-        }
+                result[@"objects"] = objects;
+            }
+            dispatch_group_leave(group);
+        }];
+        [requests addObject:maskRequest];
+        
     }
 
     if (requests.count == 0) {
@@ -531,53 +512,50 @@ RCT_EXPORT_METHOD(embedText:(NSString *)text
                  resolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
-    if (@available(iOS 17.0, *)) {
-        NLLanguageRecognizer *rec = [[NLLanguageRecognizer alloc] init];
-        [rec processString:text];
-        NLLanguage lang = [rec dominantLanguage] ?: NLLanguageEnglish;
+    NLLanguageRecognizer *rec = [[NLLanguageRecognizer alloc] init];
+    [rec processString:text];
+    NLLanguage lang = [rec dominantLanguage] ?: NLLanguageEnglish;
 
-        NLContextualEmbedding *embedding = [NLContextualEmbedding contextualEmbeddingWithLanguage:lang];
-        if (!embedding) {
-            reject(@"EMBEDDING_UNAVAILABLE",
-                   [NSString stringWithFormat:@"No contextual embedding available for language %@", lang], nil);
+    NLContextualEmbedding *embedding = [NLContextualEmbedding contextualEmbeddingWithLanguage:lang];
+    if (!embedding) {
+        reject(@"EMBEDDING_UNAVAILABLE",
+               [NSString stringWithFormat:@"No contextual embedding available for language %@", lang], nil);
+        return;
+    }
+
+    NSError *loadError = nil;
+    if (!embedding.isLoaded) {
+        BOOL ok = [embedding loadWithError:&loadError];
+        if (!ok) {
+            if (![embedding hasAvailableAssets]) {
+                [embedding requestAssets:^(NLContextualEmbeddingAssetsResult result, NSError *err) {
+                    if (result == NLContextualEmbeddingAssetsResultAvailable) {
+                        NSError *retryErr = nil;
+                        if ([embedding loadWithError:&retryErr]) {
+                            [self computeAndResolveEmbedding:embedding text:text resolve:resolve reject:reject];
+                        } else {
+                            reject(@"EMBEDDING_LOAD_FAILED", retryErr.localizedDescription ?: @"unknown", retryErr);
+                        }
+                    } else {
+                        reject(@"EMBEDDING_ASSETS_UNAVAILABLE",
+                               err.localizedDescription ?: @"Asset download failed", err);
+                    }
+                }];
+            } else {
+                reject(@"EMBEDDING_LOAD_FAILED", loadError.localizedDescription ?: @"unknown", loadError);
+            }
             return;
         }
-
-        NSError *loadError = nil;
-        if (!embedding.isLoaded) {
-            BOOL ok = [embedding loadWithError:&loadError];
-            if (!ok) {
-                if (![embedding hasAvailableAssets]) {
-                    [embedding requestAssets:^(NLContextualEmbeddingAssetsResult result, NSError *err) {
-                        if (result == NLContextualEmbeddingAssetsResultAvailable) {
-                            NSError *retryErr = nil;
-                            if ([embedding loadWithError:&retryErr]) {
-                                [self computeAndResolveEmbedding:embedding text:text resolve:resolve reject:reject];
-                            } else {
-                                reject(@"EMBEDDING_LOAD_FAILED", retryErr.localizedDescription ?: @"unknown", retryErr);
-                            }
-                        } else {
-                            reject(@"EMBEDDING_ASSETS_UNAVAILABLE",
-                                   err.localizedDescription ?: @"Asset download failed", err);
-                        }
-                    }];
-                } else {
-                    reject(@"EMBEDDING_LOAD_FAILED", loadError.localizedDescription ?: @"unknown", loadError);
-                }
-                return;
-            }
-        }
-
-        [self computeAndResolveEmbedding:embedding text:text resolve:resolve reject:reject];
-    } else {
-        reject(@"UNSUPPORTED_OS", @"NLContextualEmbedding requires iOS 17.0+", nil);
     }
+
+    [self computeAndResolveEmbedding:embedding text:text resolve:resolve reject:reject];
+    
 }
 
 - (void)computeAndResolveEmbedding:(NLContextualEmbedding *)embedding
                               text:(NSString *)text
                            resolve:(RCTPromiseResolveBlock)resolve
-                            reject:(RCTPromiseRejectBlock)reject API_AVAILABLE(ios(17.0))
+                            reject:(RCTPromiseRejectBlock)reject
 {
     NSError *err = nil;
     NLContextualEmbeddingResult *result = [embedding embeddingResultForString:text language:nil error:&err];
@@ -643,83 +621,77 @@ RCT_EXPORT_METHOD(labelImage:(NSString *)imageBase64
                  resolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
-    if (@available(iOS 13.0, *)) {
-        NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
-                                                           options:NSDataBase64DecodingIgnoreUnknownCharacters];
-        UIImage *image = [UIImage imageWithData:data];
-        if (!image || !image.CGImage) {
-            reject(@"INVALID_IMAGE", @"Failed to decode image", nil);
-            return;
-        }
-        CIImage *ciImage = [CIImage imageWithCGImage:image.CGImage];
-        VNClassifyImageRequest *req = [[VNClassifyImageRequest alloc] initWithCompletionHandler:^(VNRequest *r, NSError *error) {
-            if (error) { reject(@"LABEL_ERROR", error.localizedDescription, error); return; }
-            NSMutableArray *out = [NSMutableArray array];
-            for (VNClassificationObservation *obs in r.results) {
-                if (obs.confidence < 0.1f) continue;
-                [out addObject:@{ @"label": obs.identifier, @"confidence": @(obs.confidence) }];
-                if (out.count >= 10) break;
-            }
-            resolve(out);
-        }];
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-            VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCIImage:ciImage options:@{}];
-            NSError *err = nil;
-            if (![handler performRequests:@[req] error:&err]) {
-                reject(@"LABEL_HANDLER_ERROR", err.localizedDescription ?: @"failed", err);
-            }
-        });
-    } else {
-        reject(@"UNSUPPORTED_OS", @"Image labeling requires iOS 13.0+", nil);
+    NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
+                                                       options:NSDataBase64DecodingIgnoreUnknownCharacters];
+    UIImage *image = [UIImage imageWithData:data];
+    if (!image || !image.CGImage) {
+        reject(@"INVALID_IMAGE", @"Failed to decode image", nil);
+        return;
     }
+    CIImage *ciImage = [CIImage imageWithCGImage:image.CGImage];
+    VNClassifyImageRequest *req = [[VNClassifyImageRequest alloc] initWithCompletionHandler:^(VNRequest *r, NSError *error) {
+        if (error) { reject(@"LABEL_ERROR", error.localizedDescription, error); return; }
+        NSMutableArray *out = [NSMutableArray array];
+        for (VNClassificationObservation *obs in r.results) {
+            if (obs.confidence < 0.1f) continue;
+            [out addObject:@{ @"label": obs.identifier, @"confidence": @(obs.confidence) }];
+            if (out.count >= 10) break;
+        }
+        resolve(out);
+    }];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCIImage:ciImage options:@{}];
+        NSError *err = nil;
+        if (![handler performRequests:@[req] error:&err]) {
+            reject(@"LABEL_HANDLER_ERROR", err.localizedDescription ?: @"failed", err);
+        }
+    });
+    
 }
 
 RCT_EXPORT_METHOD(segmentPerson:(NSString *)imageBase64
                  resolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
-    if (@available(iOS 15.0, *)) {
-        NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
-                                                           options:NSDataBase64DecodingIgnoreUnknownCharacters];
-        UIImage *image = [UIImage imageWithData:data];
-        if (!image || !image.CGImage) {
-            reject(@"INVALID_IMAGE", @"Failed to decode image", nil);
-            return;
-        }
-        CIImage *ciImage = [CIImage imageWithCGImage:image.CGImage];
-        VNGeneratePersonSegmentationRequest *req = [[VNGeneratePersonSegmentationRequest alloc] initWithCompletionHandler:^(VNRequest *r, NSError *error) {
-            if (error) { reject(@"SEGMENT_ERROR", error.localizedDescription, error); return; }
-            VNPixelBufferObservation *obs = r.results.firstObject;
-            if (!obs) { reject(@"SEGMENT_NO_RESULT", @"No segmentation result", nil); return; }
-            CVPixelBufferRef buffer = obs.pixelBuffer;
-            CIImage *maskImage = [CIImage imageWithCVPixelBuffer:buffer];
-            CIContext *ctx = [CIContext context];
-            size_t w = CVPixelBufferGetWidth(buffer);
-            size_t h = CVPixelBufferGetHeight(buffer);
-            CGImageRef cgImage = [ctx createCGImage:maskImage fromRect:CGRectMake(0, 0, w, h)];
-            if (!cgImage) { reject(@"SEGMENT_RENDER_FAILED", @"Could not render mask", nil); return; }
-            UIImage *uiMask = [UIImage imageWithCGImage:cgImage];
-            CGImageRelease(cgImage);
-            NSData *pngData = UIImagePNGRepresentation(uiMask);
-            NSString *b64 = [pngData base64EncodedStringWithOptions:0];
-            resolve(@{
-                @"maskBase64": b64 ?: @"",
-                @"width": @(w),
-                @"height": @(h)
-            });
-        }];
-        req.qualityLevel = VNGeneratePersonSegmentationRequestQualityLevelBalanced;
-        req.outputPixelFormat = kCVPixelFormatType_OneComponent8;
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-            VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCIImage:ciImage options:@{}];
-            NSError *err = nil;
-            if (![handler performRequests:@[req] error:&err]) {
-                reject(@"SEGMENT_HANDLER_ERROR", err.localizedDescription ?: @"failed", err);
-            }
-        });
-    } else {
-        reject(@"UNSUPPORTED_OS", @"Person segmentation requires iOS 15.0+", nil);
+    NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
+                                                       options:NSDataBase64DecodingIgnoreUnknownCharacters];
+    UIImage *image = [UIImage imageWithData:data];
+    if (!image || !image.CGImage) {
+        reject(@"INVALID_IMAGE", @"Failed to decode image", nil);
+        return;
     }
+    CIImage *ciImage = [CIImage imageWithCGImage:image.CGImage];
+    VNGeneratePersonSegmentationRequest *req = [[VNGeneratePersonSegmentationRequest alloc] initWithCompletionHandler:^(VNRequest *r, NSError *error) {
+        if (error) { reject(@"SEGMENT_ERROR", error.localizedDescription, error); return; }
+        VNPixelBufferObservation *obs = r.results.firstObject;
+        if (!obs) { reject(@"SEGMENT_NO_RESULT", @"No segmentation result", nil); return; }
+        CVPixelBufferRef buffer = obs.pixelBuffer;
+        CIImage *maskImage = [CIImage imageWithCVPixelBuffer:buffer];
+        CIContext *ctx = [CIContext context];
+        size_t w = CVPixelBufferGetWidth(buffer);
+        size_t h = CVPixelBufferGetHeight(buffer);
+        CGImageRef cgImage = [ctx createCGImage:maskImage fromRect:CGRectMake(0, 0, w, h)];
+        if (!cgImage) { reject(@"SEGMENT_RENDER_FAILED", @"Could not render mask", nil); return; }
+        UIImage *uiMask = [UIImage imageWithCGImage:cgImage];
+        CGImageRelease(cgImage);
+        NSData *pngData = UIImagePNGRepresentation(uiMask);
+        NSString *b64 = [pngData base64EncodedStringWithOptions:0];
+        resolve(@{
+            @"maskBase64": b64 ?: @"",
+            @"width": @(w),
+            @"height": @(h)
+        });
+    }];
+    req.qualityLevel = VNGeneratePersonSegmentationRequestQualityLevelBalanced;
+    req.outputPixelFormat = kCVPixelFormatType_OneComponent8;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCIImage:ciImage options:@{}];
+        NSError *err = nil;
+        if (![handler performRequests:@[req] error:&err]) {
+            reject(@"SEGMENT_HANDLER_ERROR", err.localizedDescription ?: @"failed", err);
+        }
+    });
+    
 }
 
 #pragma mark - Speech (real, on-device)
@@ -729,61 +701,56 @@ RCT_EXPORT_METHOD(transcribeAudioFile:(NSString *)filePath
                  resolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
-    if (@available(iOS 13.0, *)) {
-        NSString *localeId = options[@"locale"] ?: @"en-US";
-        NSLocale *locale = [NSLocale localeWithLocaleIdentifier:localeId];
-        SFSpeechRecognizer *recognizer = [[SFSpeechRecognizer alloc] initWithLocale:locale];
-        if (!recognizer) {
-            reject(@"UNSUPPORTED_LOCALE", [NSString stringWithFormat:@"Locale %@ is not supported", localeId], nil);
-            return;
-        }
-        if (!recognizer.isAvailable) {
-            reject(@"RECOGNIZER_UNAVAILABLE", @"Speech recognizer is not currently available", nil);
-            return;
-        }
-        if (![SFSpeechRecognizer supportsOnDeviceRecognition]) {
-            reject(@"ON_DEVICE_UNSUPPORTED", @"On-device recognition not supported on this device", nil);
-            return;
-        }
-
-        NSURL *url = [NSURL fileURLWithPath:filePath];
-        if (![[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
-            reject(@"FILE_NOT_FOUND", [NSString stringWithFormat:@"Audio file not found: %@", filePath], nil);
-            return;
-        }
-
-        SFSpeechURLRecognitionRequest *request = [[SFSpeechURLRecognitionRequest alloc] initWithURL:url];
-        request.requiresOnDeviceRecognition = YES;
-        request.shouldReportPartialResults = NO;
-        if ([options[@"enablePunctuation"] boolValue]) {
-            if (@available(iOS 16.0, *)) {
-                request.addsPunctuation = YES;
-            }
-        }
-
-        [recognizer recognitionTaskWithRequest:request resultHandler:^(SFSpeechRecognitionResult *result, NSError *error) {
-            if (error) {
-                reject(@"RECOGNITION_ERROR", error.localizedDescription, error);
-                return;
-            }
-            if (result.isFinal) {
-                SFTranscription *best = result.bestTranscription;
-                float avgConfidence = 0.0f;
-                if (best.segments.count > 0) {
-                    float sum = 0.0f;
-                    for (SFTranscriptionSegment *seg in best.segments) sum += seg.confidence;
-                    avgConfidence = sum / best.segments.count;
-                }
-                resolve(@{
-                    @"text": best.formattedString ?: @"",
-                    @"confidence": @(avgConfidence),
-                    @"locale": localeId
-                });
-            }
-        }];
-    } else {
-        reject(@"UNSUPPORTED_OS", @"Speech recognition requires iOS 13.0+", nil);
+    NSString *localeId = options[@"locale"] ?: @"en-US";
+    NSLocale *locale = [NSLocale localeWithLocaleIdentifier:localeId];
+    SFSpeechRecognizer *recognizer = [[SFSpeechRecognizer alloc] initWithLocale:locale];
+    if (!recognizer) {
+        reject(@"UNSUPPORTED_LOCALE", [NSString stringWithFormat:@"Locale %@ is not supported", localeId], nil);
+        return;
     }
+    if (!recognizer.isAvailable) {
+        reject(@"RECOGNIZER_UNAVAILABLE", @"Speech recognizer is not currently available", nil);
+        return;
+    }
+    if (![SFSpeechRecognizer supportsOnDeviceRecognition]) {
+        reject(@"ON_DEVICE_UNSUPPORTED", @"On-device recognition not supported on this device", nil);
+        return;
+    }
+
+    NSURL *url = [NSURL fileURLWithPath:filePath];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
+        reject(@"FILE_NOT_FOUND", [NSString stringWithFormat:@"Audio file not found: %@", filePath], nil);
+        return;
+    }
+
+    SFSpeechURLRecognitionRequest *request = [[SFSpeechURLRecognitionRequest alloc] initWithURL:url];
+    request.requiresOnDeviceRecognition = YES;
+    request.shouldReportPartialResults = NO;
+    if ([options[@"enablePunctuation"] boolValue]) {
+        request.addsPunctuation = YES;
+    }
+
+    [recognizer recognitionTaskWithRequest:request resultHandler:^(SFSpeechRecognitionResult *result, NSError *error) {
+        if (error) {
+            reject(@"RECOGNITION_ERROR", error.localizedDescription, error);
+            return;
+        }
+        if (result.isFinal) {
+            SFTranscription *best = result.bestTranscription;
+            float avgConfidence = 0.0f;
+            if (best.segments.count > 0) {
+                float sum = 0.0f;
+                for (SFTranscriptionSegment *seg in best.segments) sum += seg.confidence;
+                avgConfidence = sum / best.segments.count;
+            }
+            resolve(@{
+                @"text": best.formattedString ?: @"",
+                @"confidence": @(avgConfidence),
+                @"locale": localeId
+            });
+        }
+    }];
+    
 }
 
 #pragma mark - Privacy

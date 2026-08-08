@@ -10,9 +10,14 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  # 15.1 is React Native 0.80's own floor, and this package requires 0.80+.
-  # The previous 14.0 could never have been satisfied.
-  s.platforms    = { :ios => "15.1" }
+  # 17.0, deliberately above React Native's floor of 15.1.
+  #
+  # NLContextualEmbedding — the whole of embedText — is iOS 17+. Below 17 this
+  # package is strictly less capable, and carrying availability guards for two
+  # OS versions nobody targets in 2026 bought nothing but dead branches. 17.0
+  # makes every non-generative feature here unconditional; only Foundation
+  # Models (iOS 26+) is still gated.
+  s.platforms    = { :ios => "17.0" }
   s.source       = { :git => "https://github.com/openslm-ai/mobile-ai-toolkit.git", :tag => "#{s.version}" }
 
   s.source_files = [

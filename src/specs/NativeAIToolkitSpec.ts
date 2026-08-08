@@ -4,7 +4,7 @@ import { TurboModuleRegistry } from 'react-native';
 /**
  * What a feature can do on this device *right now*.
  *
- * The distinction `features: boolean` could not make is the one callers need:
+ * The distinction a boolean flag could not make is the one callers need:
  * `downloadable` and `downloading` both mean the button should stay, with a
  * spinner or a prompt, while `unavailable` means it should go.
  */
@@ -71,33 +71,8 @@ export interface DeviceCapabilities {
   hasMLKitGenAI: boolean;
   hasOnDeviceSpeech: boolean;
   supportedLanguages: string[];
-  /**
-   * Per-feature state with a reason. This is the one to gate UI on.
-   */
+  /** Per-feature state with a reason. Gate UI on this. */
   availability: FeatureAvailabilityMap;
-  /**
-   * @deprecated Use `availability`. Derived as `state !== 'unavailable'`, so a
-   * feature whose model has not downloaded yet still reads `true` here — which
-   * is why it could never be used to decide whether a call would succeed.
-   */
-  features: {
-    analyzeText: boolean;
-    analyzeImage: boolean;
-    proofread: boolean;
-    summarize: boolean;
-    rewrite: boolean;
-    generate: boolean;
-    chat: boolean;
-    smartReplies: boolean;
-    extractEntities: boolean;
-    embedText: boolean;
-    translate: boolean;
-    transcribe: boolean;
-    scanBarcodes: boolean;
-    labelImage: boolean;
-    describeImage: boolean;
-    segmentPerson: boolean;
-  };
 }
 
 export interface ChatMessage {

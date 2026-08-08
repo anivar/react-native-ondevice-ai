@@ -21,9 +21,9 @@
 </p>
 
 <p>
-  <img alt="iOS 13+" src="https://img.shields.io/badge/iOS-13%2B-000?style=flat-square&logo=apple&logoColor=white">
+  <img alt="iOS 17+" src="https://img.shields.io/badge/iOS-17%2B-000?style=flat-square&logo=apple&logoColor=white">
   <img alt="Android API 26+" src="https://img.shields.io/badge/Android-API%2026%2B-3DDC84?style=flat-square&logo=android&logoColor=white">
-  <img alt="React Native 0.80+" src="https://img.shields.io/badge/React%20Native-%E2%89%A50.80-61dafb?style=flat-square&logo=react">
+  <img alt="React Native 0.86+" src="https://img.shields.io/badge/React%20Native-%E2%89%A50.86-61dafb?style=flat-square&logo=react">
   <img alt="React 19+" src="https://img.shields.io/badge/React-%E2%89%A519-61dafb?style=flat-square&logo=react">
   <img alt="New Architecture (TurboModule)" src="https://img.shields.io/badge/New%20Architecture-TurboModule-7c3aed?style=flat-square">
   <img alt="On-device" src="https://img.shields.io/badge/runs-on--device-22c55e?style=flat-square">
@@ -72,7 +72,9 @@ npm install @anivar/mobile-ai-toolkit@next
 cd ios && pod install
 ```
 
-Requires React Native 0.80+ (new architecture / TurboModules), React 19+. Minimum iOS 13, Android API 26.
+Requires React Native 0.86+ (new architecture / TurboModules), React 19+, iOS 17+ and Android API 26+.
+
+Both floors are deliberate rather than inherited. iOS 17 is where `NLContextualEmbedding` — all of `embedText` — becomes available; below it this package is strictly less capable and carries dead availability branches. Android 26 is ML Kit GenAI's own minimum, so API 24-25 could never have worked: the manifest merge fails. React Native's own floors are lower (iOS 15.1, API 24); these are higher on purpose.
 
 ## Capability matrix
 
@@ -163,10 +165,9 @@ on by default on Android only; iOS gets an honest rejection instead, because
 Apple ships a real summariser on eligible hardware and a silently worse result
 is not a favour. Change it with `configure({ android: { tiers: ['on-device'] } })`.
 
-`getDeviceCapabilities().features` — the old boolean map — still works and is
-still in the Quick Start, but it is deprecated and derived as
-`state !== 'unavailable'`. A feature whose model has not downloaded reads `true`
-there, which is why it could never answer "will this call succeed".
+There is no boolean `features` map. It existed, it was wrong in both directions,
+and a flag that reads `true` for a model still downloading cannot answer "will
+this call succeed" — so it was removed rather than deprecated.
 
 Every rejection is an `AIError` with a `code` you can switch on — `FEATURE_UNAVAILABLE`, `MODEL_NOT_DOWNLOADED`, `MODEL_DOWNLOAD_TIMEOUT`, `INFERENCE_FAILED`, `MODULE_NOT_LINKED` and a few more — plus `platformCode`, the platform's own more specific string. `isTransient(err)` is true when the feature could work later on this device, which is the distinction a retry button needs.
 
@@ -205,13 +206,13 @@ const labels = await labelImage(base64png);
 const { maskBase64, width, height } = await segmentPerson(base64png);
 
 // 3. Generative — gate on the feature map.
-if (caps.features.summarize) {
+if (caps.availability.summarize.state === 'available') {
   const tldr = await summarizeText(longArticle, 'bullets');
 }
-if (caps.features.generate) {
+if (caps.availability.generate.state === 'available') {
   const reply = await generateText('Write a polite decline.', { maxOutputTokens: 80 });
 }
-if (caps.features.chat) {
+if (caps.availability.chat.state === 'available') {
   const answer = await chat([
     { role: 'system', content: 'You are terse.' },
     { role: 'user', content: 'Why is the sky blue?' },
@@ -243,7 +244,7 @@ enablePrivateMode(true);
 ## Device-class gotchas
 
 - **iOS Foundation Models** (`summarizeText`, `rewriteText`, `generateText`, `chat` on iOS) require iOS 26+ on Apple-Intelligence-eligible hardware (iPhone 15 Pro / Pro Max, every iPhone 16 / 17, M-series iPad / Mac) **and** Apple Intelligence enabled in Settings. On any other configuration these methods reject `FEATURE_UNAVAILABLE` with a precise reason from `SystemLanguageModel.availability`. **The bridge itself is unverified — see the disclaimer at the top.**
-- **ML Kit GenAI** (`summarizeText`, `rewriteText`, `proofreadText`, `describeImage`, `generateText`, `chat` on Android) runs only on AICore-enabled devices: Pixel 9+, Samsung S25+, and select 2024–2026 flagships from Xiaomi / OPPO / Honor with locked bootloaders. Pixel 10+ uses Gemma 4 via AICore. On unsupported devices these methods reject with `FEATURE_UNAVAILABLE` — always check `caps.features.<method>` first.
+- **ML Kit GenAI** (`summarizeText`, `rewriteText`, `proofreadText`, `describeImage`, `generateText`, `chat` on Android) runs only on AICore-enabled devices: Pixel 9+, Samsung S25+, and select 2024–2026 flagships from Xiaomi / OPPO / Honor with locked bootloaders. Pixel 10+ uses Gemma 4 via AICore. On unsupported devices these methods reject with `FEATURE_UNAVAILABLE` — check `caps.availability.<method>.state` first, or call `explainCall('<method>')`.
 - **iOS on-device speech** (`SFSpeechRecognizer.supportsOnDeviceRecognition`) returns true on most modern devices but can be false for locales whose speech model isn't installed.
 - **iOS proofread** uses `UITextChecker` and is spelling-only; the Apple Intelligence Writing Tools rewrite UI has no programmatic invocation API.
 - **iOS embeddings** require iOS 17+ and a model loaded for the script of the input (Latin / CJK / Cyrillic / etc.); unsupported scripts reject with `FEATURE_UNAVAILABLE`.
@@ -276,7 +277,7 @@ The 2.1 release-candidate ships an unverified Foundation Models bridge because t
    import { getDeviceCapabilities, generateText, summarizeText, chat } from '@anivar/mobile-ai-toolkit';
    const caps = await getDeviceCapabilities();
    console.log('hasAppleIntelligence:', caps.hasAppleIntelligence);
-   console.log('features.generate:', caps.features.generate);
+   console.log('generate:', caps.availability.generate);
    console.log(await generateText('Write a one-line haiku about TurboModules.', { maxOutputTokens: 60 }));
    console.log(await summarizeText('React Native bridges JS to native code via TurboModules using JSI.', 'one-bullet'));
    console.log(await chat([
