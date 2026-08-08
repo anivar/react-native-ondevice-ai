@@ -4,12 +4,9 @@
 
 Nothing leaves the device. There is no cloud tier and no `fetch`, and CI fails the build if a networking symbol appears in the native sources at all.
 
-[![npm](https://img.shields.io/npm/v/mobile-ai-toolkit/latest.svg?style=flat-square&label=npm&color=cb3837&logo=npm)](https://www.npmjs.com/package/mobile-ai-toolkit)
-[![CI](https://img.shields.io/github/actions/workflow/status/openslm-ai/mobile-ai-toolkit/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white)](https://github.com/openslm-ai/mobile-ai-toolkit/actions/workflows/ci.yml)
-[![provenance](https://img.shields.io/badge/npm-provenance-success?style=flat-square&logo=npm)](https://docs.npmjs.com/generating-provenance-statements)
-![runtime deps 0](https://img.shields.io/badge/runtime%20deps-0-22c55e?style=flat-square)
-![iOS 17+](https://img.shields.io/badge/iOS-17%2B-000?style=flat-square&logo=apple&logoColor=white)
-![Android API 26+](https://img.shields.io/badge/Android-API%2026%2B-3DDC84?style=flat-square&logo=android&logoColor=white)
+[![npm](https://img.shields.io/npm/v/mobile-ai-toolkit/latest.svg?style=flat-square&label=npm&color=cb3837)](https://www.npmjs.com/package/mobile-ai-toolkit)
+[![CI](https://img.shields.io/github/actions/workflow/status/openslm-ai/mobile-ai-toolkit/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/openslm-ai/mobile-ai-toolkit/actions/workflows/ci.yml)
+&nbsp;·&nbsp; iOS 17+ &nbsp;·&nbsp; Android API 26+ &nbsp;·&nbsp; React Native 0.86+ &nbsp;·&nbsp; zero runtime dependencies &nbsp;·&nbsp; MIT
 
 ## Install
 
