@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-08-08
+
+Documentation only. No code, no API change.
+
+### Changed
+
+- The README is a front door rather than a manual: 407 lines to 95. It now
+  leads with what the package does, how to install it, a working example, and
+  the one thing that distinguishes it — that most phones cannot run a
+  generative model, so `availability` answers what the user's device can
+  actually do, per feature, with a reason.
+- Long-form material moved to `docs/`: setup, capabilities, guide, provenance,
+  and the real-device verification ask. Links are absolute, because `docs/` is
+  not in the tarball and a relative link on the npm page resolves nowhere.
+- The capability table is grouped by kind (six rows) instead of by method
+  (twenty). Someone deciding whether to install needs to know embeddings are
+  iOS-only and generative needs specific hardware; the framework names are
+  reference material.
+- Six badges down to two. The four removed were static images restating facts
+  the text gives — iOS 17+, API 26+, zero dependencies, MIT. The two kept carry
+  live state: published version and CI status.
+
 ## [2.2.0] - 2026-08-08
 
 The first release whose native code has ever been compiled. CI now assembles the
