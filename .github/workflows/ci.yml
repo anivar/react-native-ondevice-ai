@@ -70,23 +70,32 @@ jobs:
         working-directory: example
         run: npx expo prebuild --clean --no-install
 
+      # Expo does not write these into build.gradle or the Podfile directly:
+      # minSdkVersion lands in android/gradle.properties, and the Podfile reads
+      # its platform line from ios/Podfile.properties.json. Assert where the
+      # values actually live.
       - name: Assert the plugin applied
         working-directory: example
         run: |
           fail=0
-          if ! grep -q 'minSdkVersion = 26' android/build.gradle; then
-            echo "::error::minSdkVersion was not raised to 26; ML Kit GenAI will fail the manifest merge."
-            grep -n 'minSdkVersion' android/build.gradle || true
+          if ! grep -q 'android.minSdkVersion=26' android/gradle.properties; then
+            echo "::error::minSdkVersion was not raised to 26; ML Kit GenAI fails the manifest merge."
+            cat android/gradle.properties
             fail=1
           fi
-          if ! grep -q "platform :ios, '17" ios/Podfile; then
-            echo "::error::iOS deployment target was not raised to 17; pod install will refuse to resolve."
-            grep -n 'platform :ios' ios/Podfile || true
+          if ! grep -q '"ios.deploymentTarget": *"1[7-9]' ios/Podfile.properties.json; then
+            echo "::error::iOS deployment target was not raised to 17; pod install refuses to resolve."
+            cat ios/Podfile.properties.json
             fail=1
           fi
           if ! grep -rq 'NSSpeechRecognitionUsageDescription' ios/; then
             echo "::error::NSSpeechRecognitionUsageDescription missing; iOS terminates on the first speech request."
             fail=1
+          fi
+          if [ $fail -eq 0 ]; then
+            echo "Config plugin applied:"
+            grep 'android.minSdkVersion' android/gradle.properties
+            grep 'ios.deploymentTarget' ios/Podfile.properties.json
           fi
           exit $fail
 
