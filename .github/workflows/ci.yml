@@ -36,16 +36,6 @@ jobs:
       - name: No network in native sources
         run: node scripts/check-no-network.mjs
 
-      # Runs on Linux because codegen is JavaScript. Eighteen of twenty methods
-      # once carried a selector the JSI layer never calls, and the compiler
-      # reported it as a warning on a platform CI did not build.
-      - name: iOS selectors match the generated TurboModule protocol
-        run: |
-          node node_modules/react-native/scripts/generate-codegen-artifacts.js \
-            --path . --outputPath /tmp/codegen --targetPlatform ios
-          node scripts/check-ios-conformance.mjs \
-            /tmp/codegen/build/generated/ios/ReactCodegen/AIToolkitTurboModuleSpec/AIToolkitTurboModuleSpec.h
-
       - name: No unjustified Android permissions
         run: node scripts/check-permissions.mjs
 
@@ -159,11 +149,26 @@ jobs:
         working-directory: HostApp/ios
         run: RCT_NEW_ARCH_ENABLED=1 pod install
 
+      # Against the header pod install just generated — the artifact the
+      # compiler itself consumes, so the check cannot drift from what is built.
+      # Eighteen of twenty methods once carried a selector the JSI layer never
+      # calls, and clang reported it only as a warning.
+      - name: iOS selectors match the generated TurboModule protocol
+        working-directory: mobile-ai-toolkit
+        run: |
+          HEADER=$(find "$GITHUB_WORKSPACE/HostApp" -name 'AIToolkitTurboModuleSpec.h' -print -quit)
+          if [ -z "$HEADER" ]; then
+            echo "::error::pod install generated no AIToolkitTurboModuleSpec.h."
+            echo "::error::Codegen did not run for this module, so nothing was verified."
+            exit 1
+          fi
+          echo "Checking against $HEADER"
+          node scripts/check-ios-conformance.mjs "$HEADER"
+
       # Raw output, not xcpretty: the first failing run reported only
       # "CompileC ... AIToolkitTurboModule.mm" with every compiler diagnostic
       # swallowed, which is useless for the one job whose whole purpose is to
-      # surface compiler errors. The log is kept and the diagnostics reprinted
-      # at the end so a failure is readable without downloading anything.
+      # surface compiler errors. Keep the log and reprint the diagnostics.
       - name: Build for simulator
         working-directory: HostApp/ios
         run: |

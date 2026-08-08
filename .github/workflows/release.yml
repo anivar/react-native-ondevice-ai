@@ -29,8 +29,6 @@ jobs:
           npm test -- --ci
           node scripts/check-no-network.mjs
           node scripts/check-permissions.mjs
-          node node_modules/react-native/scripts/generate-codegen-artifacts.js --path . --outputPath /tmp/codegen --targetPlatform ios
-          node scripts/check-ios-conformance.mjs /tmp/codegen/build/generated/ios/ReactCodegen/AIToolkitTurboModuleSpec/AIToolkitTurboModuleSpec.h
           npm run build
 
       # The dist-tag below is derived from the tag name, but nothing checked
