@@ -22,9 +22,9 @@
  * `import type` keeps this erased at runtime — importing the spec module for a
  * type must not drag the native lookup in.
  */
-export type { UnavailableReason } from './specs/NativeAIToolkitSpec';
+export type { UnavailableReason } from './specs/NativeAIToolkit';
 
-import type { UnavailableReason } from './specs/NativeAIToolkitSpec';
+import type { UnavailableReason } from './specs/NativeAIToolkit';
 
 export const ErrorCodes = {
   /** The argument was wrong. Fixable by the caller. */

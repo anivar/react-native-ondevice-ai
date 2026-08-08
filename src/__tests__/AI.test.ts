@@ -13,7 +13,7 @@ import type {
   FeatureAvailability,
   FeatureAvailabilityMap,
   Spec,
-} from '../specs/NativeAIToolkitSpec';
+} from '../specs/NativeAIToolkit';
 
 const YES: FeatureAvailability = { state: 'available' };
 const NO_API: FeatureAvailability = {
@@ -107,7 +107,7 @@ const native: Spec = {
   isPrivateModeEnabled: jest.fn(() => false),
 };
 
-jest.mock('../specs/NativeAIToolkitSpec', () => ({
+jest.mock('../specs/NativeAIToolkit', () => ({
   __esModule: true,
   default: native,
 }));

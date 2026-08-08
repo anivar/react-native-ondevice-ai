@@ -82,7 +82,23 @@ jobs:
 
       - name: Assemble
         working-directory: HostApp/android
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace | tee /tmp/gradle.log
+
+      # The first green run of this job compiled nothing of ours: autolinking
+      # silently skipped the module, the host app built fine, and the job
+      # reported success. A build that does not include the library under test
+      # proves nothing, so assert the Kotlin was actually compiled.
+      - name: Assert the library was actually compiled
+        run: |
+          if ! grep -qE 'Task :anivar_mobile-ai-toolkit:compile.*Kotlin' /tmp/gradle.log; then
+            echo "::error::The host app built without compiling this library."
+            echo "::error::Autolinking did not pick it up, so this run verified nothing."
+            echo "Gradle tasks that did run:"
+            grep -oE '> Task :[^ ]+' /tmp/gradle.log | sort -u
+            exit 1
+          fi
+          echo "Library compiled:"
+          grep -oE '> Task :anivar_mobile-ai-toolkit:[^ ]+' /tmp/gradle.log | sort -u
 
   # macOS runners are free for public repositories, so the Swift and ObjC++ can
   # at least be compiled. Compiling is not verifying: Foundation Models needs

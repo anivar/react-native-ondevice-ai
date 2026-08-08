@@ -19,7 +19,7 @@
 import { Platform } from 'react-native';
 import { mapNativeCode } from './errorMap';
 import { AIError, ErrorCodes } from './errors';
-import NativeAIToolkit, { type Spec } from './specs/NativeAIToolkitSpec';
+import NativeAIToolkit, { type Spec } from './specs/NativeAIToolkit';
 
 function currentPlatform(): 'ios' | 'android' | 'js' {
   return Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : 'js';

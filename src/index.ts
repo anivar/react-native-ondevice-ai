@@ -29,7 +29,7 @@ export {
   isTransient,
   type UnavailableReason,
 } from './errors';
-export type * from './specs/NativeAIToolkitSpec';
+export type * from './specs/NativeAIToolkit';
 
 import type {
   Barcode,
@@ -47,7 +47,7 @@ import type {
   TextAnalysisOptions,
   Transcript,
   TranscriptionOptions,
-} from './specs/NativeAIToolkitSpec';
+} from './specs/NativeAIToolkit';
 
 export function getDeviceCapabilities(): Promise<DeviceCapabilities> {
   return call('getDeviceCapabilities', (n) => n.getDeviceCapabilities());

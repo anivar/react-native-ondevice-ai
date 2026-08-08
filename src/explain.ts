@@ -12,7 +12,7 @@
  */
 
 import { getDeviceCapabilities } from './index';
-import type { FeatureAvailability, FeatureName } from './specs/NativeAIToolkitSpec';
+import type { FeatureAvailability, FeatureName } from './specs/NativeAIToolkit';
 
 export interface CallExplanation {
   feature: FeatureName;

@@ -88,7 +88,7 @@ describe('summarize() tier routing', () => {
   });
 
   function load(summarizeImpl: () => Promise<string>) {
-    jest.doMock('../specs/NativeAIToolkitSpec', () => ({
+    jest.doMock('../specs/NativeAIToolkit', () => ({
       __esModule: true,
       default: { summarizeText: jest.fn(summarizeImpl) },
     }));
