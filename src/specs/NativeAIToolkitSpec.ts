@@ -1,6 +1,67 @@
 import type { TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
 
+/**
+ * What a feature can do on this device *right now*.
+ *
+ * The distinction `features: boolean` could not make is the one callers need:
+ * `downloadable` and `downloading` both mean the button should stay, with a
+ * spinner or a prompt, while `unavailable` means it should go.
+ */
+export type FeatureState = 'available' | 'downloadable' | 'downloading' | 'unavailable';
+
+/**
+ * Why a feature is unavailable.
+ *
+ * `os-too-old`, `hardware-ineligible` and `no-platform-api` are permanent on
+ * this device. `user-disabled` and `model-not-ready` can change without the app
+ * being updated. `not-linked` is a build problem, not a device one.
+ */
+export type UnavailableReason =
+  | 'os-too-old'
+  | 'hardware-ineligible'
+  | 'not-linked'
+  | 'user-disabled'
+  | 'model-not-ready'
+  | 'unsupported-language'
+  | 'no-platform-api'
+  | 'unknown';
+
+export interface FeatureAvailability {
+  state: FeatureState;
+  /** Set when state is `unavailable`. */
+  reason?: UnavailableReason;
+  /** Platform's own wording, for logs and bug reports. Do not parse it. */
+  detail?: string;
+  /** True when reaching `available` needs a network connection first. */
+  requiresNetwork?: boolean;
+}
+
+/**
+ * One field per feature rather than a map: TurboModule codegen cannot express
+ * `Record<string, T>` in a return type.
+ */
+export interface FeatureAvailabilityMap {
+  analyzeText: FeatureAvailability;
+  analyzeImage: FeatureAvailability;
+  proofread: FeatureAvailability;
+  summarize: FeatureAvailability;
+  rewrite: FeatureAvailability;
+  generate: FeatureAvailability;
+  chat: FeatureAvailability;
+  smartReplies: FeatureAvailability;
+  extractEntities: FeatureAvailability;
+  embedText: FeatureAvailability;
+  translate: FeatureAvailability;
+  transcribe: FeatureAvailability;
+  scanBarcodes: FeatureAvailability;
+  labelImage: FeatureAvailability;
+  describeImage: FeatureAvailability;
+  segmentPerson: FeatureAvailability;
+}
+
+export type FeatureName = keyof FeatureAvailabilityMap;
+
 export interface DeviceCapabilities {
   platform: 'ios' | 'android';
   osVersion: string;
@@ -10,6 +71,15 @@ export interface DeviceCapabilities {
   hasMLKitGenAI: boolean;
   hasOnDeviceSpeech: boolean;
   supportedLanguages: string[];
+  /**
+   * Per-feature state with a reason. This is the one to gate UI on.
+   */
+  availability: FeatureAvailabilityMap;
+  /**
+   * @deprecated Use `availability`. Derived as `state !== 'unavailable'`, so a
+   * feature whose model has not downloaded yet still reads `true` here — which
+   * is why it could never be used to decide whether a call would succeed.
+   */
   features: {
     analyzeText: boolean;
     analyzeImage: boolean;

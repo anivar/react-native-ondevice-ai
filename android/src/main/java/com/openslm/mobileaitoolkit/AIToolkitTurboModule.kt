@@ -14,6 +14,8 @@ import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
 import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.common.model.RemoteModelManager
+import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.imagedescription.ImageDescriber
 import com.google.mlkit.genai.imagedescription.ImageDescriberOptions
 import com.google.mlkit.genai.imagedescription.ImageDescription
@@ -40,6 +42,7 @@ import com.google.mlkit.nl.languageid.LanguageIdentification
 import com.google.mlkit.nl.smartreply.SmartReply
 import com.google.mlkit.nl.smartreply.TextMessage
 import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.TranslateRemoteModel
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -72,6 +75,12 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
          * the point is a bound, not a tight one.
          */
         private const val DOWNLOAD_TIMEOUT_MS = 90_000L
+
+        /**
+         * A capability probe is called to decide whether to draw a button. It
+         * must answer fast or not at all.
+         */
+        private const val CAPABILITY_PROBE_TIMEOUT_MS = 2_000L
     }
 
     override fun getName(): String = NAME
@@ -79,48 +88,190 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
     private var privateMode = false
 
     override fun getDeviceCapabilities(promise: Promise) {
-        val capabilities = Arguments.createMap().apply {
-            putString("platform", "android")
-            putString("osVersion", Build.VERSION.RELEASE)
-            putBoolean("hasNeuralEngine", false)
-            putBoolean("hasAppleIntelligence", false)
-            val hasGenAI = isMLKitGenAIPresent()
-            putBoolean("hasGeminiNano", hasGenAI)
-            putBoolean("hasMLKitGenAI", hasGenAI)
-            putBoolean("hasOnDeviceSpeech", SpeechRecognizer.isRecognitionAvailable(reactContext))
+        // The GenAI probe is asynchronous — checkFeatureStatus() talks to
+        // AICore — so the whole response is assembled in the callback.
+        probeGenAiAvailability { genAi ->
+            val availability = Arguments.createMap().apply {
+                // Always present: plain ML Kit, bundled, no download, no AICore.
+                putMap("analyzeText", available())
+                putMap("analyzeImage", available())
+                putMap("smartReplies", available())
+                putMap("scanBarcodes", available())
+                putMap("labelImage", available())
+                putMap("segmentPerson", available())
 
-            val langs = Arguments.createArray().apply {
-                TranslateLanguage.getAllLanguages().forEach { pushString(it) }
+                // Downloads a model on first use, then works offline.
+                putMap("extractEntities", downloadableOnFirstUse())
+                putMap("translate", downloadableOnFirstUse())
+
+                // GenAI: the real per-feature answer from AICore.
+                putMap("summarize", genAi.copy())
+                putMap("rewrite", genAi.copy())
+                putMap("proofread", genAi.copy())
+                putMap("generate", genAi.copy())
+                putMap("chat", genAi.copy())
+                putMap("describeImage", genAi.copy())
+
+                // No Android API at all for these two.
+                putMap("embedText", unavailable("no-platform-api",
+                    "ML Kit exposes no contextual text embedding on Android."))
+                putMap("transcribe", unavailable("no-platform-api",
+                    "Android's SpeechRecognizer is microphone-only; " +
+                        "transcribeAudioFile takes a file path."))
             }
-            putArray("supportedLanguages", langs)
 
-            putMap("features", Arguments.createMap().apply {
-                putBoolean("analyzeText", true)
-                putBoolean("analyzeImage", true)
-                putBoolean("proofread", hasGenAI)
-                putBoolean("summarize", hasGenAI)
-                putBoolean("rewrite", hasGenAI)
-                putBoolean("generate", hasGenAI)
-                putBoolean("chat", hasGenAI)
-                putBoolean("smartReplies", true)
-                putBoolean("extractEntities", true)
-                putBoolean("embedText", false)
-                putBoolean("translate", true)
-                // False, despite SpeechRecognizer being available: the only
-                // transcription method this module exposes is file-based, and
-                // it rejects on Android. Reporting the microphone recogniser's
-                // availability here told callers a method would work when it
-                // could not.
-                putBoolean("transcribe", false)
-                putBoolean("scanBarcodes", true)
-                putBoolean("labelImage", true)
-                putBoolean("describeImage", hasGenAI)
-                putBoolean("segmentPerson", true)
-            })
+            val capabilities = Arguments.createMap().apply {
+                putString("platform", "android")
+                putString("osVersion", Build.VERSION.RELEASE)
+                putBoolean("hasNeuralEngine", false)
+                putBoolean("hasAppleIntelligence", false)
+                val genAiUsable = genAi.getString("state") != "unavailable"
+                putBoolean("hasGeminiNano", genAiUsable)
+                putBoolean("hasMLKitGenAI", genAiUsable)
+                putBoolean("hasOnDeviceSpeech", SpeechRecognizer.isRecognitionAvailable(reactContext))
+
+                putArray("supportedLanguages", Arguments.createArray().apply {
+                    TranslateLanguage.getAllLanguages().forEach { pushString(it) }
+                })
+
+                putMap("availability", availability)
+                // Deprecated, derived, and kept because it is in the documented
+                // Quick Start. Anything not flatly unavailable reads true.
+                putMap("features", deriveFeatureFlags(availability))
+            }
+            promise.resolve(capabilities)
         }
-        promise.resolve(capabilities)
     }
 
+    // ---- Availability helpers ----
+
+    private fun availabilityMap(
+        state: String,
+        reason: String? = null,
+        detail: String? = null,
+        requiresNetwork: Boolean = false
+    ): WritableMap = Arguments.createMap().apply {
+        putString("state", state)
+        reason?.let { putString("reason", it) }
+        detail?.let { putString("detail", it) }
+        putBoolean("requiresNetwork", requiresNetwork)
+    }
+
+    private fun available() = availabilityMap("available")
+
+    private fun downloadableOnFirstUse() = availabilityMap(
+        "downloadable",
+        detail = "ML Kit downloads this model on first use, then works offline.",
+        requiresNetwork = true
+    )
+
+    private fun unavailable(reason: String, detail: String) =
+        availabilityMap("unavailable", reason = reason, detail = detail)
+
+    /** WritableMap cannot be reused across keys, so each feature gets a copy. */
+    private fun WritableMap.copy(): WritableMap = Arguments.createMap().apply {
+        merge(this@copy)
+    }
+
+    private fun deriveFeatureFlags(availability: WritableMap): WritableMap {
+        val flags = Arguments.createMap()
+        val it = availability.keySetIterator()
+        while (it.hasNextKey()) {
+            val key = it.nextKey()
+            val state = availability.getMap(key)?.getString("state")
+            flags.putBoolean(key, state != "unavailable")
+        }
+        return flags
+    }
+
+    /**
+     * The honest GenAI answer, replacing a `Class.forName` check.
+     *
+     * `Class.forName` only says the ML Kit GenAI classes were compiled into the
+     * APK. It is true on every device that built with the dependency, including
+     * the overwhelming majority that have no AICore and where every generative
+     * call fails — which is why `features.summarize` used to promise a feature
+     * that could not run. It does still distinguish one real case: a build that
+     * omitted the dependency, which is `not-linked`.
+     *
+     * checkFeatureStatus() is the API that actually knows, and its success
+     * value carries the distinction that matters — AVAILABLE, DOWNLOADABLE or
+     * DOWNLOADING.
+     */
+    private fun probeGenAiAvailability(callback: (WritableMap) -> Unit) {
+        if (!isMLKitGenAIPresent()) {
+            callback(
+                unavailable(
+                    "not-linked",
+                    "The ML Kit GenAI dependency is not in this build."
+                )
+            )
+            return
+        }
+
+        val settled = java.util.concurrent.atomic.AtomicBoolean(false)
+        fun finish(map: WritableMap) {
+            if (settled.compareAndSet(false, true)) callback(map)
+        }
+
+        // A capability probe must never be the thing that hangs a screen.
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            finish(
+                availabilityMap(
+                    "unavailable",
+                    reason = "unknown",
+                    detail = "AICore did not answer within " +
+                        "${CAPABILITY_PROBE_TIMEOUT_MS}ms."
+                )
+            )
+        }, CAPABILITY_PROBE_TIMEOUT_MS)
+
+        try {
+            val summarizer = Summarization.getClient(
+                SummarizerOptions.builder(reactContext)
+                    .setInputType(SummarizerOptions.InputType.ARTICLE)
+                    .setOutputType(SummarizerOptions.OutputType.THREE_BULLETS)
+                    .setLanguage(SummarizerOptions.Language.ENGLISH)
+                    .build()
+            )
+            summarizer.checkFeatureStatus()
+                .addOnSuccessListener { status ->
+                    finish(
+                        when (status) {
+                            FeatureStatus.AVAILABLE -> available()
+                            FeatureStatus.DOWNLOADABLE -> availabilityMap(
+                                "downloadable",
+                                detail = "AICore can download the generative model for this device.",
+                                requiresNetwork = true
+                            )
+                            FeatureStatus.DOWNLOADING -> availabilityMap(
+                                "downloading",
+                                detail = "AICore is downloading the generative model."
+                            )
+                            else -> unavailable(
+                                "hardware-ineligible",
+                                "This device does not support ML Kit GenAI (AICore)."
+                            )
+                        }
+                    )
+                }
+                .addOnFailureListener { e ->
+                    finish(
+                        unavailable(
+                            "hardware-ineligible",
+                            "AICore is not usable on this device. ${e.message}"
+                        )
+                    )
+                }
+        } catch (e: Throwable) {
+            finish(unavailable("unknown", "GenAI probe failed: ${e.message}"))
+        }
+    }
+
+    /**
+     * Answers one question only: was the GenAI dependency compiled in? It
+     * cannot tell whether this device can run it — see probeGenAiAvailability.
+     */
     private fun isMLKitGenAIPresent(): Boolean = try {
         Class.forName("com.google.mlkit.genai.summarization.Summarization")
         true
@@ -193,8 +344,24 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
             }
         }, DOWNLOAD_TIMEOUT_MS)
 
-        extractor.downloadModelIfNeeded()
-            .continueWithTask { extractor.annotate(EntityExtractionParams.Builder(text).build()) }
+        // Private mode: annotate with a model already on the device, but never
+        // fetch one. isModelDownloaded answers locally.
+        val work = if (privateMode) {
+            extractor.isModelDownloaded.continueWithTask { downloaded ->
+                if (downloaded.result != true) {
+                    throw java.io.IOException(
+                        "Private mode is on and the entity-extraction model is not on " +
+                            "this device. Downloading it would require a network request."
+                    )
+                }
+                extractor.annotate(EntityExtractionParams.Builder(text).build())
+            }
+        } else {
+            extractor.downloadModelIfNeeded()
+                .continueWithTask { extractor.annotate(EntityExtractionParams.Builder(text).build()) }
+        }
+
+        work
             .addOnSuccessListener { annotations ->
                 val arr = Arguments.createArray()
                 annotations.forEach { ann ->
@@ -512,6 +679,41 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
         // caller who does not want one had no way to opt out.
         val conditions = DownloadConditions.Builder().build()
         val settled = rejectIfDownloadStalls(promise) { translator.close() }
+
+        // Private mode: use the model if it is already here, refuse to fetch it
+        // if it is not. RemoteModelManager answers without touching the network.
+        if (privateMode) {
+            RemoteModelManager.getInstance()
+                .isModelDownloaded(TranslateRemoteModel.Builder(tgt).build())
+                .addOnSuccessListener { present ->
+                    if (!present) {
+                        if (settled.compareAndSet(false, true)) {
+                            blockedByPrivateMode(promise, "translation")
+                            translator.close()
+                        }
+                    } else {
+                        runTranslation(translator, text, promise, settled, conditions)
+                    }
+                }
+                .addOnFailureListener {
+                    if (settled.compareAndSet(false, true)) {
+                        promise.reject("TRANSLATE_ERROR", it.message, it)
+                        translator.close()
+                    }
+                }
+            return
+        }
+
+        runTranslation(translator, text, promise, settled, conditions)
+    }
+
+    private fun runTranslation(
+        translator: com.google.mlkit.nl.translate.Translator,
+        text: String,
+        promise: Promise,
+        settled: java.util.concurrent.atomic.AtomicBoolean,
+        conditions: DownloadConditions
+    ) {
         translator.downloadModelIfNeeded(conditions)
             .continueWithTask { translator.translate(text) }
             .addOnSuccessListener { translated ->
@@ -830,9 +1032,34 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
 
     // ---- Privacy ----
 
+    /**
+     * Private mode was dead code: stored here, returned by the getter, read by
+     * nothing. It is now enforced at the two places in this module that touch
+     * the network — the entity-extraction and translation model downloads.
+     *
+     * Inference itself never leaves the device on either platform, so those
+     * downloads were the only network activity there was. With private mode on,
+     * a feature whose model is already present keeps working offline, and one
+     * whose model is missing rejects instead of quietly fetching it.
+     */
     override fun enablePrivateMode(enabled: Boolean) {
         privateMode = enabled
     }
 
     override fun isPrivateModeEnabled(): Boolean = privateMode
+
+    /**
+     * Rejects when a model download is about to happen and private mode forbids
+     * it. Returns true if the caller should stop.
+     */
+    private fun blockedByPrivateMode(promise: Promise, what: String): Boolean {
+        if (!privateMode) return false
+        promise.reject(
+            "MODEL_NOT_DOWNLOADED",
+            "Private mode is on and the $what model is not on this device. " +
+                "Downloading it would require a network request. Turn private " +
+                "mode off once to fetch the model, then it works offline."
+        )
+        return true
+    }
 }

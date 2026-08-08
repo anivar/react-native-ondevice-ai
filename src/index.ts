@@ -158,3 +158,4 @@ export function isPrivateModeEnabled(): boolean {
 }
 
 export { requireNative } from './call';
+export { type CallExplanation, explainCall } from './explain';

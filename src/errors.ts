@@ -15,21 +15,16 @@
  */
 
 /**
- * Why a feature is unavailable, when the code is FEATURE_UNAVAILABLE.
+ * Why a feature is unavailable, when the code is FEATURE_UNAVAILABLE. Same
+ * type the availability map uses, so a reason read from `getDeviceCapabilities`
+ * and one read off a rejection are directly comparable.
  *
- * The distinction that matters to a UI is permanence: `os-too-old` and
- * `hardware-ineligible` mean hide the button forever on this device, while
- * `user-disabled` and `model-not-ready` mean it may work later.
+ * `import type` keeps this erased at runtime — importing the spec module for a
+ * type must not drag the native lookup in.
  */
-export type UnavailableReason =
-  | 'os-too-old'
-  | 'hardware-ineligible'
-  | 'not-linked'
-  | 'user-disabled'
-  | 'model-not-ready'
-  | 'unsupported-language'
-  | 'no-platform-api'
-  | 'unknown';
+export type { UnavailableReason } from './specs/NativeAIToolkitSpec';
+
+import type { UnavailableReason } from './specs/NativeAIToolkitSpec';
 
 export const ErrorCodes = {
   /** The argument was wrong. Fixable by the caller. */

@@ -93,8 +93,12 @@ export const NATIVE_ERROR_MAP: Readonly<Record<string, Mapping>> = Object.freeze
   EMBEDDING_LOAD_FAILED: { code: ErrorCodes.INFERENCE_FAILED },
   EMBEDDING_ERROR: { code: ErrorCodes.INFERENCE_FAILED },
 
-  // ---- added by this slice, raised from Kotlin ----
+  // ---- raised from Kotlin by the availability and privacy work ----
   MODEL_DOWNLOAD_TIMEOUT: { code: ErrorCodes.MODEL_DOWNLOAD_TIMEOUT },
+  // Private mode is on and the model is not on the device, so fetching it
+  // would mean a network request. Transient: it resolves the moment the model
+  // is present, or private mode is turned off once.
+  MODEL_NOT_DOWNLOADED: { code: ErrorCodes.MODEL_NOT_DOWNLOADED },
 });
 
 export function mapNativeCode(nativeCode: string): Mapping {

@@ -9,7 +9,43 @@
  * argument — would have passed on a typo's TypeError just as happily.
  */
 
-import type { Spec } from '../specs/NativeAIToolkitSpec';
+import type {
+  DeviceCapabilities,
+  FeatureAvailability,
+  FeatureAvailabilityMap,
+  Spec,
+} from '../specs/NativeAIToolkitSpec';
+
+const YES: FeatureAvailability = { state: 'available' };
+const NO_API: FeatureAvailability = {
+  state: 'unavailable',
+  reason: 'no-platform-api',
+  detail: 'No public iOS API.',
+};
+
+/**
+ * An eligible iOS 26 device whose Apple Intelligence model is still
+ * downloading — the case a boolean flag could not represent, and the reason
+ * `availability` exists.
+ */
+const availability: FeatureAvailabilityMap = {
+  analyzeText: YES,
+  analyzeImage: YES,
+  proofread: YES,
+  extractEntities: YES,
+  scanBarcodes: YES,
+  labelImage: YES,
+  segmentPerson: YES,
+  embedText: YES,
+  transcribe: YES,
+  summarize: { state: 'downloading', detail: 'Apple Intelligence model is downloading.' },
+  rewrite: { state: 'downloading' },
+  generate: { state: 'downloading' },
+  chat: { state: 'downloading' },
+  smartReplies: NO_API,
+  translate: NO_API,
+  describeImage: NO_API,
+};
 
 /** Builds the error shape React Native delivers from a native reject. */
 function nativeReject(code: string): Error & { code: string } {
@@ -26,24 +62,12 @@ const native: Spec = {
     hasMLKitGenAI: false,
     hasOnDeviceSpeech: true,
     supportedLanguages: ['en', 'es'],
-    features: {
-      analyzeText: true,
-      analyzeImage: true,
-      proofread: true,
-      summarize: false,
-      rewrite: false,
-      generate: false,
-      chat: false,
-      smartReplies: false,
-      extractEntities: true,
-      embedText: true,
-      translate: false,
-      transcribe: true,
-      scanBarcodes: true,
-      labelImage: true,
-      describeImage: false,
-      segmentPerson: true,
-    },
+    availability,
+    // Derived exactly as native derives it, so the test cannot drift from the
+    // rule it is documenting.
+    features: Object.fromEntries(
+      Object.entries(availability).map(([k, v]) => [k, v.state !== 'unavailable'])
+    ) as DeviceCapabilities['features'],
   })),
   analyzeText: jest.fn(async () => ({
     language: 'en',
@@ -100,6 +124,7 @@ import {
   chat,
   ErrorCodes,
   enablePrivateMode,
+  explainCall,
   extractEntities,
   generateText,
   getDeviceCapabilities,
@@ -121,6 +146,46 @@ describe('mobile-ai-toolkit', () => {
     expect(typeof analyzeImage).toBe('function');
     expect(typeof proofreadText).toBe('function');
     expect(typeof transcribeAudioFile).toBe('function');
+  });
+
+  test('availability separates "not yet" from "never here"', async () => {
+    const caps = await getDeviceCapabilities();
+
+    // The whole point: both of these read `true` in the deprecated boolean map,
+    // and they are not the same answer.
+    expect(caps.availability.summarize.state).toBe('downloading');
+    expect(caps.availability.translate.state).toBe('unavailable');
+    expect(caps.availability.translate.reason).toBe('no-platform-api');
+  });
+
+  test('the deprecated features map cannot express the difference', async () => {
+    const caps = await getDeviceCapabilities();
+    // Documenting the flaw rather than pretending it is gone: a downloading
+    // model still reads true here, which is why `features` cannot answer
+    // "will this call succeed".
+    expect(caps.features.summarize).toBe(true);
+    expect(caps.availability.summarize.state).not.toBe('available');
+  });
+
+  test('explainCall answers without running inference', async () => {
+    const plan = await explainCall('summarize');
+    expect(plan.willSucceed).toBe(false);
+    expect(plan.mayChangeLater).toBe(true);
+    expect(plan.summary).toMatch(/downloading/i);
+
+    const dead = await explainCall('translate');
+    expect(dead.willSucceed).toBe(false);
+    // no-platform-api is permanent, so a UI should hide this one for good.
+    expect(dead.mayChangeLater).toBe(false);
+
+    const works = await explainCall('analyzeText');
+    expect(works.willSucceed).toBe(true);
+  });
+
+  test('explainCall with no argument covers every feature', async () => {
+    const all = await explainCall();
+    expect(all).toHaveLength(16);
+    expect(all.every((p) => typeof p.summary === 'string')).toBe(true);
   });
 
   test('getDeviceCapabilities returns shape with features map', async () => {

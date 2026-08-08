@@ -40,55 +40,89 @@ RCT_EXPORT_METHOD(getDeviceCapabilities:(RCTPromiseResolveBlock)resolve
     capabilities[@"hasMLKitGenAI"] = @NO;
     capabilities[@"hasGeminiNano"] = @NO;
 
-    BOOL hasFoundationModels = NO;
+    // Generative availability, straight from SystemLanguageModel.availability.
+    //
+    // The WTWritingToolsCoordinator fallback that used to sit here is gone. It
+    // asked whether the WritingTools class exists, which is true on every iOS
+    // 18.1 device regardless of whether that device is Apple-Intelligence
+    // eligible or has the feature switched on. hasAppleIntelligence — and with
+    // it four generative feature flags — therefore read YES on hardware where
+    // every generative call rejects.
+    NSString *genState = @"unavailable";
+    NSString *genReason = @"os-too-old";
+    NSString *genDetail = @"Foundation Models requires iOS 26 or later.";
 #if AI_HAS_FOUNDATION_BRIDGE
     if (@available(iOS 26.0, *)) {
-        hasFoundationModels = [AIToolkitFoundationModels isAvailable];
+        genState = [AIToolkitFoundationModels availabilityState];
+        genReason = [AIToolkitFoundationModels availabilityReason];
+        genDetail = [AIToolkitFoundationModels unavailableReason];
     }
 #endif
-    BOOL hasAppleIntelligence = hasFoundationModels;
-    if (@available(iOS 18.1, *)) {
-        if (!hasAppleIntelligence) {
-            hasAppleIntelligence = NSClassFromString(@"WTWritingToolsCoordinator") != nil;
-        }
-    }
-    capabilities[@"hasAppleIntelligence"] = @(hasAppleIntelligence);
+    BOOL hasFoundationModels = [genState isEqualToString:@"available"];
+    capabilities[@"hasAppleIntelligence"] = @(hasFoundationModels);
 
-    if (@available(iOS 13.0, *)) {
-        capabilities[@"hasOnDeviceSpeech"] = @([SFSpeechRecognizer supportsOnDeviceRecognition]);
-    } else {
-        capabilities[@"hasOnDeviceSpeech"] = @NO;
-    }
-
+    BOOL hasOnDeviceSpeech = [SFSpeechRecognizer supportsOnDeviceRecognition];
+    capabilities[@"hasOnDeviceSpeech"] = @(hasOnDeviceSpeech);
     capabilities[@"supportedLanguages"] = [NLLanguageRecognizer supportedLanguages] ?: @[];
 
-    BOOL hasContextualEmbedding = NO;
-    if (@available(iOS 17.0, *)) {
-        hasContextualEmbedding = YES;
-    }
-    BOOL hasPersonSegmentation = NO;
-    if (@available(iOS 15.0, *)) {
-        hasPersonSegmentation = YES;
-    }
-
-    capabilities[@"features"] = @{
-        @"analyzeText": @YES,
-        @"analyzeImage": @YES,
-        @"proofread": @YES,
-        @"summarize": @(hasFoundationModels),
-        @"rewrite": @(hasFoundationModels),
-        @"generate": @(hasFoundationModels),
-        @"chat": @(hasFoundationModels),
-        @"smartReplies": @NO,
-        @"extractEntities": @YES,
-        @"embedText": @(hasContextualEmbedding),
-        @"translate": @NO,
-        @"transcribe": capabilities[@"hasOnDeviceSpeech"],
-        @"scanBarcodes": @YES,
-        @"labelImage": @YES,
-        @"describeImage": @NO,
-        @"segmentPerson": @(hasPersonSegmentation)
+    NSDictionary *(^ok)(void) = ^NSDictionary *{
+        return @{ @"state": @"available", @"requiresNetwork": @NO };
     };
+    NSDictionary *(^no)(NSString *, NSString *) = ^NSDictionary *(NSString *reason, NSString *detail) {
+        return @{ @"state": @"unavailable", @"reason": reason,
+                  @"detail": detail, @"requiresNetwork": @NO };
+    };
+
+    // The generative six share one answer, and it carries its own reason.
+    NSDictionary *gen = hasFoundationModels
+        ? ok()
+        : @{ @"state": genState, @"reason": genReason,
+             @"detail": genDetail, @"requiresNetwork": @NO };
+
+    // `@available` is only valid as an if-condition, not inside an expression.
+    NSDictionary *embed = no(@"os-too-old", @"NLContextualEmbedding requires iOS 17 or later.");
+    if (@available(iOS 17.0, *)) {
+        embed = ok();
+    }
+    NSDictionary *segment = no(@"os-too-old", @"Person segmentation requires iOS 15 or later.");
+    if (@available(iOS 15.0, *)) {
+        segment = ok();
+    }
+    NSDictionary *transcribe = hasOnDeviceSpeech
+        ? ok()
+        : no(@"hardware-ineligible",
+             @"This device has no on-device speech recognition for the current locale.");
+
+    NSDictionary *availability = @{
+        @"analyzeText": ok(),
+        @"analyzeImage": ok(),
+        @"proofread": ok(),          // UITextChecker, spelling only — always present
+        @"extractEntities": ok(),
+        @"scanBarcodes": ok(),
+        @"labelImage": ok(),
+        @"segmentPerson": segment,
+        @"embedText": embed,
+        @"transcribe": transcribe,
+        @"summarize": gen,
+        @"rewrite": gen,
+        @"generate": gen,
+        @"chat": gen,
+        @"describeImage": no(@"no-platform-api",
+                             @"iOS has no on-device image captioning API."),
+        @"smartReplies": no(@"no-platform-api",
+                            @"iOS has no public smart-reply API."),
+        @"translate": no(@"no-platform-api",
+                         @"The Translation framework has no on-device string API."),
+    };
+    capabilities[@"availability"] = availability;
+
+    // Deprecated, derived. `downloading` and `downloadable` both read YES here,
+    // which is exactly why a boolean could not answer "will this call work".
+    NSMutableDictionary *features = [NSMutableDictionary dictionaryWithCapacity:availability.count];
+    [availability enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSDictionary *value, BOOL *stop) {
+        features[key] = @(![value[@"state"] isEqualToString:@"unavailable"]);
+    }];
+    capabilities[@"features"] = features;
 
     resolve(capabilities);
 }
@@ -756,6 +790,20 @@ RCT_EXPORT_METHOD(transcribeAudioFile:(NSString *)filePath
 
 static BOOL privateMode = NO;
 
+BOOL AIToolkitPrivateModeEnabled(void) { return privateMode; }
+
+/**
+ * On iOS every framework this module uses runs on-device with no network:
+ * Vision, NaturalLanguage, UITextChecker, Foundation Models, and
+ * SFSpeechRecognizer with requiresOnDeviceRecognition = YES. There is no
+ * download path here as there is on Android, so private mode has nothing to
+ * block on this platform. It is a no-op, and saying so is better than leaving
+ * a stored value that looks like a control.
+ *
+ * The one place it might have mattered — speech recognition falling back to
+ * Apple's servers — is already closed unconditionally, for every caller,
+ * private mode or not.
+ */
 RCT_EXPORT_METHOD(enablePrivateMode:(BOOL)enabled)
 {
     privateMode = enabled;

@@ -99,7 +99,36 @@ Every method below maps to a real platform call. ✅ = on-device. 🧪 = on-devi
 | `translateText(text, src, tgt)` | ❌ — Translation framework bridge tracked for v2.2 | ✅ ML Kit `Translator` (GA, downloads language pack on first use) |
 | `transcribeAudioFile(path, opts)` | ✅ `SFSpeechRecognizer` with `requiresOnDeviceRecognition = true` | ❌ — rejects `FILE_TRANSCRIPTION_UNSUPPORTED`. Android's `SpeechRecognizer` is microphone-only on stock platforms |
 
-`getDeviceCapabilities().features` returns a `Record<MethodName, boolean>` map, useful for showing or hiding UI. Treat it as a hint and still handle rejections: on Android the generative flags currently reflect whether the ML Kit GenAI classes were compiled into your APK, not whether this device has AICore, so they can read `true` where the call will fail. Honest per-feature availability is the subject of the next minor.
+### Knowing what will actually work
+
+`getDeviceCapabilities().availability` gives a per-feature state with a reason:
+
+```ts
+const { availability } = await getDeviceCapabilities();
+availability.summarize
+// { state: 'downloadable', requiresNetwork: true,
+//   detail: 'AICore can download the generative model for this device.' }
+```
+
+`state` is one of `available`, `downloadable`, `downloading` or `unavailable`. The
+split that matters is permanence — `unavailable` carries a `reason`, and
+`os-too-old`, `hardware-ineligible` and `no-platform-api` mean hide the button on
+this device for good, while `user-disabled` and `model-not-ready` can change
+without your app being updated.
+
+On Android this comes from ML Kit's `checkFeatureStatus()`, and on iOS from
+`SystemLanguageModel.availability` — the signals both platforms already had and
+this package used to throw away.
+
+`explainCall(feature)` answers the same question as a sentence, and with no
+argument returns the plan for all 16 features. It runs no inference and touches
+no network. Since the two platforms deliberately differ, it is the only way to
+see the other platform's answer without owning the hardware.
+
+`getDeviceCapabilities().features` — the old boolean map — still works and is
+still in the Quick Start, but it is deprecated and derived as
+`state !== 'unavailable'`. A feature whose model has not downloaded reads `true`
+there, which is why it could never answer "will this call succeed".
 
 Every rejection is an `AIError` with a `code` you can switch on — `FEATURE_UNAVAILABLE`, `MODEL_NOT_DOWNLOADED`, `MODEL_DOWNLOAD_TIMEOUT`, `INFERENCE_FAILED`, `MODULE_NOT_LINKED` and a few more — plus `platformCode`, the platform's own more specific string. `isTransient(err)` is true when the feature could work later on this device, which is the distinction a retry button needs.
 
