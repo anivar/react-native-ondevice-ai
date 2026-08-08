@@ -57,8 +57,19 @@ jobs:
         # Prerelease tags (e.g. v2.3.0-rc.1) ship under the `next` dist-tag so a
         # default `npm install` keeps pulling `latest`. Tags with no hyphen
         # become `latest`.
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm --version
+          if [ -n "${NPM_TOKEN}" ]; then
+            echo "Authenticating with the stored NPM_TOKEN."
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+          else
+            echo "No NPM_TOKEN set - relying on Trusted Publishing (OIDC)."
+            echo "If this fails with E404 on PUT, npm had no credential: either the"
+            echo "trusted publisher is not registered for this package, or its fields"
+            echo "do not match this repository and workflow file exactly."
+          fi
           if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
             echo "Publishing prerelease ${GITHUB_REF_NAME} under dist-tag 'next'"
             npm publish --provenance --access public --tag next
