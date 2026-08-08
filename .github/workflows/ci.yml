@@ -31,9 +31,13 @@ jobs:
       - name: Test
         run: npm test -- --ci
 
-      # Cheap, and the only automated check of the package's central claim.
+      # Cheap, and the only automated checks of what this package does to a
+      # consuming app: what it can reach, and what it makes that app ask for.
       - name: No network in native sources
         run: node scripts/check-no-network.mjs
+
+      - name: No unjustified Android permissions
+        run: node scripts/check-permissions.mjs
 
       - name: Build
         run: npm run build

@@ -127,6 +127,20 @@ argument returns the plan for all 16 features. It runs no inference and touches
 no network. Since the two platforms deliberately differ, it is the only way to
 see the other platform's answer without owning the hardware.
 
+### Permissions
+
+The library declares exactly one Android permission, `INTERNET`, and it is there
+for two features: `translateText` and `extractEntities` download an ML Kit model
+on first use. Both work offline afterwards, and `enablePrivateMode(true)` refuses
+the download rather than performing it.
+
+Nothing else is declared. A library's permissions merge into your app's manifest
+and appear in your store listing, so this one is checked in CI against an
+allowlist that names the feature requiring each entry.
+
+On iOS, `transcribeAudioFile` needs `NSSpeechRecognitionUsageDescription` in your
+Info.plist.
+
 ### Working with or without a network
 
 Nothing in this package sends anything anywhere. There is no cloud tier, no
