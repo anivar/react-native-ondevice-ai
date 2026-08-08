@@ -701,6 +701,48 @@ RCT_EXPORT_METHOD(transcribeAudioFile:(NSString *)filePath
                  resolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
+    // Speech recognition needs the user's permission before anything else works.
+    // Without this call SFSpeechRecognizer.isAvailable is NO, so every request
+    // failed as RECOGNIZER_UNAVAILABLE — which reads as "your device cannot do
+    // this" when the truth is "nobody has been asked yet". Authorization is
+    // required even with requiresOnDeviceRecognition = YES.
+    //
+    // Your app needs NSSpeechRecognitionUsageDescription in its Info.plist; iOS
+    // terminates the process on the first request if it is missing.
+    [SFSpeechRecognizer requestAuthorization:^(SFSpeechRecognizerAuthorizationStatus status) {
+        // The callback is not guaranteed to be on the main queue, and the work
+        // below touches nothing thread-confined, but the promise blocks are
+        // safest resolved off a known queue.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            switch (status) {
+                case SFSpeechRecognizerAuthorizationStatusAuthorized:
+                    break;
+                case SFSpeechRecognizerAuthorizationStatusDenied:
+                    reject(@"SPEECH_PERMISSION_DENIED",
+                           @"The user declined speech recognition. It can be re-enabled "
+                           @"in Settings > Privacy & Security > Speech Recognition.", nil);
+                    return;
+                case SFSpeechRecognizerAuthorizationStatusRestricted:
+                    reject(@"SPEECH_PERMISSION_RESTRICTED",
+                           @"Speech recognition is restricted on this device, most often "
+                           @"by parental controls or an MDM policy.", nil);
+                    return;
+                case SFSpeechRecognizerAuthorizationStatusNotDetermined:
+                default:
+                    reject(@"SPEECH_PERMISSION_DENIED",
+                           @"Speech recognition authorization was not granted.", nil);
+                    return;
+            }
+            [self transcribeAuthorized:filePath options:options resolver:resolve rejecter:reject];
+        });
+    }];
+}
+
+- (void)transcribeAuthorized:(NSString *)filePath
+                     options:(NSDictionary *)options
+                    resolver:(RCTPromiseResolveBlock)resolve
+                    rejecter:(RCTPromiseRejectBlock)reject
+{
     NSString *localeId = options[@"locale"] ?: @"en-US";
     NSLocale *locale = [NSLocale localeWithLocaleIdentifier:localeId];
     SFSpeechRecognizer *recognizer = [[SFSpeechRecognizer alloc] initWithLocale:locale];

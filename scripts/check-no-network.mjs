@@ -6,10 +6,10 @@
  * until now it was an assertion in a README. This makes it checkable: any
  * networking symbol appearing in the Kotlin, ObjC++ or Swift fails the build.
  *
- * When an opt-in cloud tier is added (3.0, per the roadmap), the transport goes
- * in one designated file listed in ALLOWED, and everything else stays clean.
- * That way a network call cannot be introduced quietly at an inference site —
- * it has to be moved into a file whose diff everyone is watching.
+ * If networking is ever needed, it goes in one designated file listed in
+ * ALLOWED and everything else stays clean. That way a network call cannot be
+ * introduced quietly at an inference site — it has to be moved into a file
+ * whose diff everyone is watching.
  *
  * This checks source text, not behaviour: a dependency could still make
  * requests. It is a floor, not a proof, and it is the cheapest floor available.

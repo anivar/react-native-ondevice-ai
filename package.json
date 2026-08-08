@@ -19,6 +19,7 @@
     "src/",
     "ios/",
     "android/",
+    "app.plugin.js",
     "README.md",
     "LICENSE",
     "MobileAIToolkit.podspec"

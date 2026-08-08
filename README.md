@@ -127,6 +127,26 @@ argument returns the plan for all 16 features. It runs no inference and touches
 no network. Since the two platforms deliberately differ, it is the only way to
 see the other platform's answer without owning the hardware.
 
+### Expo
+
+Expo SDK 55+ requires the New Architecture, which is what this package targets,
+so a modern Expo app is a first-class host. Add the plugin:
+
+```json
+{ "expo": { "plugins": ["@anivar/mobile-ai-toolkit"] } }
+```
+
+It sets the Android `minSdkVersion` to 26, the iOS deployment target to 17, and
+the speech usage string — raising each only if your project is lower, never
+overwriting a higher value or a description you wrote yourself. Without it the
+Android manifest merge fails, because Expo's default `minSdkVersion` is below
+ML Kit GenAI's minimum.
+
+You need a development build (`npx expo prebuild` or EAS). The native code
+cannot exist in Expo Go — but importing the package there no longer crashes the
+bundle, so a capability check degrades to a `MODULE_NOT_LINKED` rejection you
+can catch instead of a white screen.
+
 ### Permissions
 
 The library declares exactly one Android permission, `INTERNET`, and it is there
@@ -309,16 +329,10 @@ We also welcome:
 - **iOS / Swift devs** willing to review `ios/AIToolkitFoundationModels.swift` for correctness against the documented Foundation Models API.
 - **Android / ML Kit GenAI users** with a Pixel 9+ or S25+ — bug reports against the Beta APIs are useful too.
 
-## Roadmap
-
-- **v2.1.0 GA** — gated on at least one community confirmation that the Foundation Models bridge works end-to-end on real hardware. Until then, 2.1.x stays under the `next` dist-tag.
-- **v2.2** — Streaming variants of `generateText` / `summarizeText` / `rewriteText` / `chat` (token callbacks) on Android via the Prompt API streaming surface.
-- **v2.2** — Apple Translation framework bridge for `translateText` on iOS 18+ via SwiftUI host integration.
-
 ## Supply chain & provenance
 
 - Every release on npm is published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) — the `Provenance` badge on the npm page links to the exact GitHub Actions run that built and signed the tarball.
-- The package has zero runtime dependencies. `peerDependencies` are `react ≥19` and `react-native ≥0.80`.
+- The package has zero runtime dependencies. `peerDependencies` are `react ≥19` and `react-native ≥0.86`.
 - Releases are tagged on GitHub and built by the [release workflow](.github/workflows/release.yml) — the workflow file is the single source of truth for what gets published.
 
 ## About OpenSLM

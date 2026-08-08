@@ -46,12 +46,18 @@ export const NATIVE_ERROR_MAP: Readonly<Record<string, Mapping>> = Object.freeze
   },
   ON_DEVICE_UNSUPPORTED: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'no-platform-api' },
   UNSUPPORTED_OS: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'os-too-old' },
-  // Carries a precise reason in its message on iOS (SystemLanguageModel
-  // .availability) and on Android (ML Kit checkFeatureStatus). Slice 2 lifts
-  // that into `reason`; until then it stays honestly unknown rather than
-  // guessing at a cause.
+  // The precise cause is carried in the message on iOS (SystemLanguageModel
+  // .availability) and on Android (ML Kit checkFeatureStatus). Until that is
+  // lifted into `reason`, this stays honestly unknown rather than guessing.
   FEATURE_UNAVAILABLE: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'unknown' },
   RECOGNIZER_UNAVAILABLE: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'unknown' },
+  // The user said no, or was never asked. Not a device limitation — it can be
+  // reversed in Settings, which is why it is `user-disabled` and not
+  // `hardware-ineligible`.
+  SPEECH_PERMISSION_DENIED: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'user-disabled' },
+  // Parental controls or an MDM policy. The user cannot reverse this one
+  // themselves, but the device is capable, so it is still not a hardware fact.
+  SPEECH_PERMISSION_RESTRICTED: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'user-disabled' },
 
   // ---- would work after a download ----
   EMBEDDING_ASSETS_UNAVAILABLE: { code: ErrorCodes.MODEL_NOT_DOWNLOADED },
