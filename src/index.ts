@@ -159,3 +159,14 @@ export function isPrivateModeEnabled(): boolean {
 
 export { requireNative } from './call';
 export { type CallExplanation, explainCall } from './explain';
+export {
+  type ExtractiveSummary,
+  summarizeExtractive,
+} from './fallbacks/summarizeExtractive';
+export { configure, resetPolicy, type Tier, type TierPolicy } from './policy';
+export {
+  type Attempt,
+  type SummarizeOptions,
+  type SummarizeResult,
+  summarize,
+} from './summarize';

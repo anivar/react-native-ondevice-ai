@@ -125,6 +125,44 @@ argument returns the plan for all 16 features. It runs no inference and touches
 no network. Since the two platforms deliberately differ, it is the only way to
 see the other platform's answer without owning the hardware.
 
+### Working with or without a network
+
+Nothing in this package sends anything anywhere. There is no cloud tier, no
+`fetch`, and CI fails the build if a networking symbol appears in the native
+sources at all.
+
+"Offline" still has two meanings worth separating. Inference is always local on
+both platforms. But two Android features — translation and entity extraction —
+download a model on first use, and that download needs a network. After it, they
+work offline forever. `availability` marks those with `requiresNetwork: true`
+while they are still `downloadable`.
+
+`enablePrivateMode(true)` makes that explicit: a model already on the device
+keeps working, and one that is missing rejects `MODEL_NOT_DOWNLOADED` rather
+than quietly fetching it. On iOS there is no download path at all, so private
+mode is a no-op there and the README says so rather than implying a control that
+does not exist.
+
+For devices with no generative model — most non-Pixel Android — `summarize()`
+can fall back to a bundled extractive summariser:
+
+```ts
+const { value, tier, degraded, attempts } = await summarize(article);
+// tier: 'on-device' | 'local-deterministic', degraded: true when it fell back
+```
+
+It selects sentences from the input and never composes new text, so it cannot
+state anything the source did not. It ships no weights and adds no bytes to
+your app. Results always carry `degraded: true` and the full `attempts` trace,
+so you can tell a real model's output from a fallback's, and see why.
+
+`summarizeText()` is unchanged and never falls back — it is the platform model
+or a rejection, permanently. Fallback behaviour requires calling a differently
+named function, so no upgrade can introduce it on your behalf. The fallback is
+on by default on Android only; iOS gets an honest rejection instead, because
+Apple ships a real summariser on eligible hardware and a silently worse result
+is not a favour. Change it with `configure({ android: { tiers: ['on-device'] } })`.
+
 `getDeviceCapabilities().features` — the old boolean map — still works and is
 still in the Quick Start, but it is deprecated and derived as
 `state !== 'unavailable'`. A feature whose model has not downloaded reads `true`
