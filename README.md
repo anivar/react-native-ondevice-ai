@@ -392,6 +392,11 @@ bug reports from Pixel 9+ / Galaxy S25+ owners against the ML Kit GenAI beta.
 language models and the runtimes that make them usable on the hardware people
 actually own.
 
+The npm package sits in the maintainer's personal scope (`@anivar`) for
+historical reasons while the repository lives under the
+[openslm-ai](https://github.com/openslm-ai) organisation. Same project; the
+scope is just where it was first published.
+
 It is built to the [Open Small Models Accord](https://openslm.ai/accord), and
 two of its principles shape this package directly.
 
