@@ -133,13 +133,24 @@ jobs:
         working-directory: HostApp/ios
         run: RCT_NEW_ARCH_ENABLED=1 pod install
 
+      # Raw output, not xcpretty: the first failing run reported only
+      # "CompileC ... AIToolkitTurboModule.mm" with every compiler diagnostic
+      # swallowed, which is useless for the one job whose whole purpose is to
+      # surface compiler errors. The log is kept and the diagnostics reprinted
+      # at the end so a failure is readable without downloading anything.
       - name: Build for simulator
         working-directory: HostApp/ios
         run: |
+          set -o pipefail
           xcodebuild -workspace HostApp.xcworkspace -scheme HostApp \
             -sdk iphonesimulator -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
-            build CODE_SIGNING_ALLOWED=NO | xcpretty && exit ${PIPESTATUS[0]}
+            build CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/xcodebuild.log || {
+              echo "::group::Compiler diagnostics"
+              grep -E '(error|warning):' /tmp/xcodebuild.log | sort -u || true
+              echo "::endgroup::"
+              exit 1
+            }
 
       # A green iOS build proves nothing about the generative path if the
       # compiler never saw it: `#if canImport(FoundationModels)` silently
