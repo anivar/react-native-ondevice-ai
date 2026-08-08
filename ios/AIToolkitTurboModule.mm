@@ -745,7 +745,7 @@ RCT_EXPORT_METHOD(transcribeAudioFile:(NSString *)filePath
                            @"Speech recognition authorization was not granted.", nil);
                     return;
             }
-            [self transcribeAuthorized:filePath options:options resolver:resolve rejecter:reject];
+            [self transcribeAuthorized:filePath options:options resolve:resolve reject:reject];
         });
     }];
 }
