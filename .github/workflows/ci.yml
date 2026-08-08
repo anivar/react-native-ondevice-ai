@@ -42,6 +42,54 @@ jobs:
       - name: Build
         run: npm run build
 
+  # The claim the config plugin makes is that an Expo project can install this
+  # and build. That is checkable without a device: prebuild generates the native
+  # projects, and the plugin's whole job is to leave minSdkVersion at 26, the
+  # iOS deployment target at 17, and the speech usage string in the Info.plist.
+  # Assert all three, because a plugin that silently no-ops looks identical to
+  # one that works until someone tries to build.
+  expo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install the library
+        run: npm ci
+
+      - name: Build the library
+        run: npm run build
+
+      - name: Install the example
+        working-directory: example
+        run: npm install
+
+      - name: Prebuild
+        working-directory: example
+        run: npx expo prebuild --clean --no-install
+
+      - name: Assert the plugin applied
+        working-directory: example
+        run: |
+          fail=0
+          if ! grep -q 'minSdkVersion = 26' android/build.gradle; then
+            echo "::error::minSdkVersion was not raised to 26; ML Kit GenAI will fail the manifest merge."
+            grep -n 'minSdkVersion' android/build.gradle || true
+            fail=1
+          fi
+          if ! grep -q "platform :ios, '17" ios/Podfile; then
+            echo "::error::iOS deployment target was not raised to 17; pod install will refuse to resolve."
+            grep -n 'platform :ios' ios/Podfile || true
+            fail=1
+          fi
+          if ! grep -rq 'NSSpeechRecognitionUsageDescription' ios/; then
+            echo "::error::NSSpeechRecognitionUsageDescription missing; iOS terminates on the first speech request."
+            fail=1
+          fi
+          exit $fail
+
   # Compiles the Kotlin. Until this job existed, none of the 800 lines in
   # AIToolkitTurboModule.kt had ever been through a compiler.
   #

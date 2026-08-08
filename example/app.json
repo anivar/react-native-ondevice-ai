@@ -1,4 +1,19 @@
 {
-  "name": "MobileAIToolkitExample",
-  "displayName": "Mobile AI Toolkit Example"
+  "expo": {
+    "name": "Mobile AI Toolkit Example",
+    "slug": "mobile-ai-toolkit-example",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "ai.openslm.mobileaitoolkit.example",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "ai.openslm.mobileaitoolkit.example"
+    },
+    "plugins": [
+      "@anivar/mobile-ai-toolkit"
+    ]
+  }
 }
