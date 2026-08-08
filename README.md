@@ -413,6 +413,13 @@ of its own — those belong to Apple and Google, and neither is inspectable. Wha
 you can fork here is the binding, not the model. Per §4 that is *inference*
 forkability, not training forkability, and the difference matters.
 
+## Citing this
+
+Releases are archived with a DOI. `CITATION.cff` carries the metadata GitHub's
+"Cite this repository" button reads, including the LWD-R disclosure, so a
+citation records what layers the release actually meets rather than only its
+name.
+
 ## License
 
 MIT © [Anivar Aravind](https://github.com/anivar) / [OpenSLM](https://github.com/openslm-ai)

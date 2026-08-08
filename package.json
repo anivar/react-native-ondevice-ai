@@ -1,6 +1,6 @@
 {
   "name": "@anivar/mobile-ai-toolkit",
-  "version": "2.1.0-rc.5",
+  "version": "2.2.0",
   "description": "On-device AI for React Native. Nothing leaves the device. One API shape, per-platform behaviour, fully disclosed.",
   "main": "lib/index.js",
   "module": "lib/index.js",
