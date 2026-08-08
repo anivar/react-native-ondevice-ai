@@ -42,11 +42,23 @@ jobs:
       - name: Check package contents
         run: npx --yes publint
 
+      # Trusted Publishing: npm authenticates this workflow by its OIDC identity
+      # (repository + workflow file), so there is no NPM_TOKEN to store, rotate
+      # or leak, and nothing expires. npm's own token screen recommends it over
+      # an automation token for exactly this use.
+      #
+      # `--provenance` is implied by trusted publishing, but stays explicit so
+      # the intent is readable: the attestation is what lets the README claim
+      # every release links back to the run that built it.
+      #
+      # Requires npm >= 11.5.1, which node 24 provides, and the `id-token: write`
+      # permission granted above.
       - name: Publish
-        # Prerelease tags (e.g. v2.1.0-rc.1) ship under the `next` dist-tag so
-        # default `npm install` keeps pulling the verified `latest`. Tags with
-        # no hyphen (v2.0.0, v2.1.0) become `latest` automatically.
+        # Prerelease tags (e.g. v2.3.0-rc.1) ship under the `next` dist-tag so a
+        # default `npm install` keeps pulling `latest`. Tags with no hyphen
+        # become `latest`.
         run: |
+          npm --version
           if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
             echo "Publishing prerelease ${GITHUB_REF_NAME} under dist-tag 'next'"
             npm publish --provenance --access public --tag next
@@ -54,5 +66,3 @@ jobs:
             echo "Publishing release ${GITHUB_REF_NAME} under dist-tag 'latest'"
             npm publish --provenance --access public
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
