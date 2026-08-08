@@ -3,7 +3,6 @@
   "version": "2.2.0",
   "description": "On-device AI for React Native. Nothing leaves the device. One API shape, per-platform behaviour, fully disclosed.",
   "main": "lib/index.js",
-  "module": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
     ".": {
@@ -59,7 +58,7 @@
   "homepage": "https://openslm.ai",
   "repository": {
     "type": "git",
-    "url": "https://github.com/openslm-ai/mobile-ai-toolkit.git"
+    "url": "git+https://github.com/openslm-ai/mobile-ai-toolkit.git"
   },
   "bugs": {
     "url": "https://github.com/openslm-ai/mobile-ai-toolkit/issues"
@@ -94,5 +93,6 @@
     "android": {
       "javaPackageName": "com.openslm.mobileaitoolkit"
     }
-  }
+  },
+  "type": "commonjs"
 }
