@@ -392,40 +392,8 @@ bug reports from Pixel 9+ / Galaxy S25+ owners against the ML Kit GenAI beta.
 language models and the runtimes that make them usable on the hardware people
 actually own.
 
-### Moving from `@anivar/mobile-ai-toolkit`
-
-This package used to be published under a personal scope. It now ships
-unscoped, as `mobile-ai-toolkit`, which matches the repository and does not
-imply the work belongs to one person's namespace rather than the org.
-
-```diff
-- import { summarize } from '@anivar/mobile-ai-toolkit';
-+ import { summarize } from 'mobile-ai-toolkit';
-```
-
-The scoped package is deprecated and points here. Nothing else changes — same
-API, same repository, same maintainer.
-
-It is built to the [Open Small Models Accord](https://openslm.ai/accord), and
-two of its principles shape this package directly.
-
-**§5, local inference.** Inference stays where the people it affects can reach
-it. That is why there is no cloud tier and why the absence is CI-enforced rather
-than asserted.
-
-**§5 also names what this package is honest about.** Apple Foundation Models
-and Gemini Nano are closed runtimes on proprietary NPUs, distributed through
-app stores — local, but not *open*. Wrapping them is the pragmatic path, not the
-principled one, and the Accord calls that hardware capture. This package says so
-rather than presenting the two as equivalent. Portable formats such as GGUF and
-ONNX are the named exit.
-
-**§2 and §10, disclosure at the release.** Under the Accord's LWD-R layers this
-package is **Logic only**: inference and routing code, MIT-licensed and
-readable. It ships no weights, no training data, and no representational schema
-of its own — those belong to Apple and Google, and neither is inspectable. What
-you can fork here is the binding, not the model. Per §4 that is *inference*
-forkability, not training forkability, and the difference matters.
+This package was briefly published under a personal scope. That package has
+been removed; `mobile-ai-toolkit` is the only name.
 
 ## Citing this
 
