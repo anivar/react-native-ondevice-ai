@@ -1,4 +1,4 @@
-# @anivar/mobile-ai-toolkit
+# mobile-ai-toolkit
 
 [![an OpenSLM project](https://img.shields.io/badge/an%20OpenSLM-project-1E2A78?style=flat-square&labelColor=0b1118)](https://openslm.ai)
 [![Open Small Models Accord](https://img.shields.io/badge/Open%20Small%20Models-Accord-1E2A78?style=flat-square&labelColor=0b1118)](https://openslm.ai/accord)
@@ -6,11 +6,11 @@
 > **On-device AI for React Native.** One unified TypeScript API; each method is a thin TurboModule binding to a documented platform framework — Apple Foundation Models / Vision / NaturalLanguage / Speech on iOS, Google ML Kit (incl. ML Kit GenAI on AICore-enabled devices) on Android. Nothing leaves the device, nothing is mocked.
 
 <p>
-  <a href="https://www.npmjs.com/package/@anivar/mobile-ai-toolkit"><img alt="npm (latest)" src="https://img.shields.io/npm/v/@anivar/mobile-ai-toolkit/latest.svg?style=flat-square&label=npm%20latest&color=cb3837&logo=npm"></a>
-  <a href="https://www.npmjs.com/package/@anivar/mobile-ai-toolkit?activeTab=versions"><img alt="npm (next)" src="https://img.shields.io/npm/v/@anivar/mobile-ai-toolkit/next.svg?style=flat-square&label=npm%20next&color=ff8800&logo=npm"></a>
-  <a href="https://www.npmjs.com/package/@anivar/mobile-ai-toolkit"><img alt="downloads" src="https://img.shields.io/npm/dm/@anivar/mobile-ai-toolkit.svg?style=flat-square&color=0aa"></a>
-  <a href="https://bundlephobia.com/package/@anivar/mobile-ai-toolkit"><img alt="bundle size" src="https://img.shields.io/bundlephobia/minzip/@anivar/mobile-ai-toolkit?style=flat-square&label=min%2Bgzip"></a>
-  <a href="https://packagephobia.com/result?p=@anivar/mobile-ai-toolkit"><img alt="install size" src="https://badgen.net/packagephobia/install/@anivar/mobile-ai-toolkit?style=flat-square"></a>
+  <a href="https://www.npmjs.com/package/mobile-ai-toolkit"><img alt="npm (latest)" src="https://img.shields.io/npm/v/mobile-ai-toolkit/latest.svg?style=flat-square&label=npm%20latest&color=cb3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/mobile-ai-toolkit?activeTab=versions"><img alt="npm (next)" src="https://img.shields.io/npm/v/mobile-ai-toolkit/next.svg?style=flat-square&label=npm%20next&color=ff8800&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/mobile-ai-toolkit"><img alt="downloads" src="https://img.shields.io/npm/dm/mobile-ai-toolkit.svg?style=flat-square&color=0aa"></a>
+  <a href="https://bundlephobia.com/package/mobile-ai-toolkit"><img alt="bundle size" src="https://img.shields.io/bundlephobia/minzip/mobile-ai-toolkit?style=flat-square&label=min%2Bgzip"></a>
+  <a href="https://packagephobia.com/result?p=mobile-ai-toolkit"><img alt="install size" src="https://badgen.net/packagephobia/install/mobile-ai-toolkit?style=flat-square"></a>
 </p>
 
 <p>
@@ -18,7 +18,7 @@
   <a href="https://github.com/openslm-ai/mobile-ai-toolkit/actions/workflows/release.yml"><img alt="Release" src="https://img.shields.io/github/actions/workflow/status/openslm-ai/mobile-ai-toolkit/release.yml?style=flat-square&label=release&logo=githubactions&logoColor=white"></a>
   <a href="https://docs.npmjs.com/generating-provenance-statements"><img alt="npm provenance" src="https://img.shields.io/badge/npm-provenance-success?style=flat-square&logo=npm"></a>
   <a href="https://github.com/openslm-ai/mobile-ai-toolkit/security/policy"><img alt="security policy" src="https://img.shields.io/badge/security-policy-informational?style=flat-square&logo=keybase"></a>
-  <a href="https://www.npmjs.com/package/@anivar/mobile-ai-toolkit"><img alt="types: included" src="https://img.shields.io/npm/types/@anivar/mobile-ai-toolkit?style=flat-square&logo=typescript&logoColor=white"></a>
+  <a href="https://www.npmjs.com/package/mobile-ai-toolkit"><img alt="types: included" src="https://img.shields.io/npm/types/mobile-ai-toolkit?style=flat-square&logo=typescript&logoColor=white"></a>
 </p>
 
 <p>
@@ -78,14 +78,14 @@ One API shape, per-platform behaviour, fully disclosed. The two platforms do not
 Stable:
 
 ```bash
-npm install @anivar/mobile-ai-toolkit
+npm install mobile-ai-toolkit
 cd ios && pod install
 ```
 
 Pre-release channel:
 
 ```bash
-npm install @anivar/mobile-ai-toolkit@next
+npm install mobile-ai-toolkit@next
 cd ios && pod install
 ```
 
@@ -115,7 +115,7 @@ Expo SDK 55+ requires the New Architecture, which is what this package targets,
 so a modern Expo app is a first-class host. Add the plugin:
 
 ```json
-{ "expo": { "plugins": ["@anivar/mobile-ai-toolkit"] } }
+{ "expo": { "plugins": ["mobile-ai-toolkit"] } }
 ```
 
 It sets the Android `minSdkVersion` to 26, the iOS deployment target to 17, and
@@ -255,7 +255,7 @@ import {
   smartReplies,
   translateText,
   transcribeAudioFile,
-} from '@anivar/mobile-ai-toolkit';
+} from 'mobile-ai-toolkit';
 
 // 1. Probe once at startup, gate UI on the feature map.
 const caps = await getDeviceCapabilities();
@@ -302,7 +302,7 @@ const t = await transcribeAudioFile('/path/to/clip.m4a', { locale: 'en-US' });
 ### Private mode
 
 ```ts
-import { enablePrivateMode, isPrivateModeEnabled } from '@anivar/mobile-ai-toolkit';
+import { enablePrivateMode, isPrivateModeEnabled } from 'mobile-ai-toolkit';
 enablePrivateMode(true);
 ```
 
@@ -356,7 +356,7 @@ effort. **If you own any of these, ten minutes closes it:**
 with Apple Intelligence enabled in **Settings → Apple Intelligence & Siri**.
 
 ```ts
-import { getDeviceCapabilities, explainCall, generateText } from '@anivar/mobile-ai-toolkit';
+import { getDeviceCapabilities, explainCall, generateText } from 'mobile-ai-toolkit';
 
 console.log((await getDeviceCapabilities()).availability.generate);
 console.log(await explainCall('generate'));
@@ -392,10 +392,19 @@ bug reports from Pixel 9+ / Galaxy S25+ owners against the ML Kit GenAI beta.
 language models and the runtimes that make them usable on the hardware people
 actually own.
 
-The npm package sits in the maintainer's personal scope (`@anivar`) for
-historical reasons while the repository lives under the
-[openslm-ai](https://github.com/openslm-ai) organisation. Same project; the
-scope is just where it was first published.
+### Moving from `@anivar/mobile-ai-toolkit`
+
+This package used to be published under a personal scope. It now ships
+unscoped, as `mobile-ai-toolkit`, which matches the repository and does not
+imply the work belongs to one person's namespace rather than the org.
+
+```diff
+- import { summarize } from '@anivar/mobile-ai-toolkit';
++ import { summarize } from 'mobile-ai-toolkit';
+```
+
+The scoped package is deprecated and points here. Nothing else changes — same
+API, same repository, same maintainer.
 
 It is built to the [Open Small Models Accord](https://openslm.ai/accord), and
 two of its principles shape this package directly.

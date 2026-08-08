@@ -1,5 +1,5 @@
 {
-  "name": "@anivar/mobile-ai-toolkit-example",
+  "name": "mobile-ai-toolkit-example",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,7 +12,7 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-native": "^0.86.2",
-    "@anivar/mobile-ai-toolkit": "file:..",
+    "mobile-ai-toolkit": "file:..",
     "expo": "~55.0.0"
   },
   "devDependencies": {

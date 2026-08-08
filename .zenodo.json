@@ -29,7 +29,7 @@
       "resource_type": "publication-standard"
     },
     {
-      "identifier": "https://www.npmjs.com/package/@anivar/mobile-ai-toolkit",
+      "identifier": "https://www.npmjs.com/package/mobile-ai-toolkit",
       "relation": "isIdenticalTo",
       "resource_type": "software"
     }

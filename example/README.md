@@ -1,6 +1,6 @@
 # Mobile AI Toolkit — example
 
-An Expo app that shows what `@anivar/mobile-ai-toolkit` can actually do **on
+An Expo app that shows what `mobile-ai-toolkit` can actually do **on
 your device**, which is the only question that matters for a package like this.
 
 Most on-device AI demos show generation working on the one phone the author

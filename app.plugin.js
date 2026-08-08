@@ -15,11 +15,11 @@
  *
  * Usage in app.json:
  *
- *   { "expo": { "plugins": ["@anivar/mobile-ai-toolkit"] } }
+ *   { "expo": { "plugins": ["mobile-ai-toolkit"] } }
  *
  * or, to customise the permission prompt:
  *
- *   { "expo": { "plugins": [["@anivar/mobile-ai-toolkit", {
+ *   { "expo": { "plugins": [["mobile-ai-toolkit", {
  *       "speechRecognitionPermission": "Used to transcribe your voice notes on device."
  *   }]] } }
  */
