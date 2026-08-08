@@ -61,9 +61,24 @@ RCT_EXPORT_METHOD(getDeviceCapabilities:(RCTPromiseResolveBlock)resolve
     BOOL hasFoundationModels = [genState isEqualToString:@"available"];
     capabilities[@"hasAppleIntelligence"] = @(hasFoundationModels);
 
-    BOOL hasOnDeviceSpeech = [SFSpeechRecognizer supportsOnDeviceRecognition];
+    // supportsOnDeviceRecognition is an instance property, not a class method,
+    // and it is per-locale: a device can have an offline model for one language
+    // and not another. Probing the current locale is the honest answer for a
+    // capability check.
+    SFSpeechRecognizer *speechProbe =
+        [[SFSpeechRecognizer alloc] initWithLocale:[NSLocale currentLocale]];
+    BOOL hasOnDeviceSpeech = speechProbe != nil && speechProbe.supportsOnDeviceRecognition;
     capabilities[@"hasOnDeviceSpeech"] = @(hasOnDeviceSpeech);
-    capabilities[@"supportedLanguages"] = [NLLanguageRecognizer supportedLanguages] ?: @[];
+
+    // NLLanguageRecognizer has no +supportedLanguages. The language list that
+    // actually means something here is the set of locales speech recognition
+    // supports — the only language-bound feature on this platform.
+    NSMutableArray<NSString *> *languages = [NSMutableArray array];
+    for (NSLocale *locale in [SFSpeechRecognizer supportedLocales]) {
+        [languages addObject:locale.localeIdentifier];
+    }
+    [languages sortUsingSelector:@selector(compare:)];
+    capabilities[@"supportedLanguages"] = languages;
 
     NSDictionary *(^ok)(void) = ^NSDictionary *{
         return @{ @"state": @"available", @"requiresNetwork": @NO };
@@ -165,9 +180,9 @@ RCT_EXPORT_METHOD(analyzeText:(NSString *)text
     tagger.string = text;
     NSMutableArray *entities = [NSMutableArray array];
     NSRange range = NSMakeRange(0, text.length);
-    NLTaggerOptions opts = NLTaggerOptionsOmitWhitespace |
-                           NLTaggerOptionsOmitPunctuation |
-                           NLTaggerOptionsJoinNames;
+    NLTaggerOptions opts = NLTaggerOmitWhitespace |
+                           NLTaggerOmitPunctuation |
+                           NLTaggerJoinNames;
     [tagger enumerateTagsInRange:range
                             unit:NLTokenUnitWord
                           scheme:NLTagSchemeNameType
@@ -268,30 +283,15 @@ RCT_EXPORT_METHOD(analyzeImage:(NSString *)imageBase64
         [requests addObject:faceRequest];
     }
 
-    if ([options[@"detectObjects"] boolValue]) {
-        dispatch_group_enter(group);
-        VNGenerateForegroundInstanceMaskRequest *maskRequest = [[VNGenerateForegroundInstanceMaskRequest alloc] initWithCompletionHandler:^(VNRequest *req, NSError *error) {
-            if (!error) {
-                NSMutableArray *objects = [NSMutableArray array];
-                for (VNInstanceMaskObservation *obs in req.results) {
-                    [objects addObject:@{
-                        @"label": @"foreground",
-                        @"confidence": @(obs.confidence),
-                        @"bounds": @{
-                            @"x": @(obs.boundingBox.origin.x * image.size.width),
-                            @"y": @(obs.boundingBox.origin.y * image.size.height),
-                            @"width": @(obs.boundingBox.size.width * image.size.width),
-                            @"height": @(obs.boundingBox.size.height * image.size.height)
-                        }
-                    }];
-                }
-                result[@"objects"] = objects;
-            }
-            dispatch_group_leave(group);
-        }];
-        [requests addObject:maskRequest];
-        
-    }
+    // No object detection on iOS. Vision has no general-purpose object
+    // detector, and VNGenerateForegroundInstanceMaskRequest — which was used
+    // here — returns VNInstanceMaskObservation, which has no boundingBox to
+    // build an ImageAnalysis.object from. It segments foreground; it does not
+    // say what the foreground is.
+    //
+    // `objects` therefore stays empty on iOS and is populated by ML Kit on
+    // Android. getDeviceCapabilities reports this difference rather than
+    // hiding it.
 
     if (requests.count == 0) {
         resolve(result);
@@ -523,12 +523,15 @@ RCT_EXPORT_METHOD(embedText:(NSString *)text
         return;
     }
 
+    // There is no `isLoaded`. Loading is idempotent, so attempt it and treat
+    // failure as "assets are probably missing", which is the only recoverable
+    // case anyway.
     NSError *loadError = nil;
-    if (!embedding.isLoaded) {
+    {
         BOOL ok = [embedding loadWithError:&loadError];
         if (!ok) {
             if (![embedding hasAvailableAssets]) {
-                [embedding requestAssets:^(NLContextualEmbeddingAssetsResult result, NSError *err) {
+                [embedding requestEmbeddingAssetsWithCompletionHandler:^(NLContextualEmbeddingAssetsResult result, NSError *err) {
                     if (result == NLContextualEmbeddingAssetsResultAvailable) {
                         NSError *retryErr = nil;
                         if ([embedding loadWithError:&retryErr]) {
@@ -563,16 +566,33 @@ RCT_EXPORT_METHOD(embedText:(NSString *)text
         reject(@"EMBEDDING_ERROR", err.localizedDescription ?: @"Failed to compute embedding", err);
         return;
     }
-    NSMutableArray<NSNumber *> *vector = [NSMutableArray array];
-    NSUInteger dim = result.embeddingArray.firstObject.count;
-    for (NSUInteger i = 0; i < dim; i++) {
-        double sum = 0.0;
-        NSUInteger n = 0;
-        for (NSArray<NSNumber *> *tokenVec in result.embeddingArray) {
-            sum += [tokenVec[i] doubleValue];
-            n++;
+    // NLContextualEmbeddingResult has no `embeddingArray`. Token vectors are
+    // enumerated, so mean-pool over them in one pass: a per-token embedding is
+    // not what a caller asking for "the embedding of this string" wants, and
+    // mean pooling is the conventional reduction.
+    NSUInteger dimension = embedding.dimension;
+    NSMutableArray<NSNumber *> *sums = [NSMutableArray arrayWithCapacity:dimension];
+    for (NSUInteger i = 0; i < dimension; i++) {
+        [sums addObject:@0.0];
+    }
+
+    __block NSUInteger tokenCount = 0;
+    [result enumerateTokenVectorsInRange:NSMakeRange(0, text.length)
+                              usingBlock:^(NSArray<NSNumber *> *tokenVector, NSRange tokenRange, BOOL *stop) {
+        for (NSUInteger i = 0; i < dimension && i < tokenVector.count; i++) {
+            sums[i] = @(sums[i].doubleValue + tokenVector[i].doubleValue);
         }
-        [vector addObject:@(n > 0 ? sum / n : 0.0)];
+        tokenCount++;
+    }];
+
+    if (tokenCount == 0) {
+        reject(@"EMBEDDING_ERROR", @"The model returned no token vectors for this text", nil);
+        return;
+    }
+
+    NSMutableArray<NSNumber *> *vector = [NSMutableArray arrayWithCapacity:dimension];
+    for (NSUInteger i = 0; i < dimension; i++) {
+        [vector addObject:@(sums[i].doubleValue / (double)tokenCount)];
     }
     resolve(vector);
 }
