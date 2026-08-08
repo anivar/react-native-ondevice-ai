@@ -24,12 +24,27 @@
  *   }]] } }
  */
 
+/**
+ * `expo/config-plugins` is the documented entry point, but it only resolves
+ * when this file is loaded from inside an app that has expo installed. A
+ * library linked with `file:` — which is how the example and CI consume it —
+ * resolves from the library's own directory instead, where it is absent. Fall
+ * back to `@expo/config-plugins`, the package that subpath re-exports.
+ */
+function loadConfigPlugins() {
+  try {
+    return require('expo/config-plugins');
+  } catch {
+    return require('@expo/config-plugins');
+  }
+}
+
 const {
   createRunOncePlugin,
   withInfoPlist,
   withGradleProperties,
   withPodfileProperties,
-} = require('expo/config-plugins');
+} = loadConfigPlugins();
 
 const pkg = require('./package.json');
 
