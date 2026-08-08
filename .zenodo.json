@@ -1,0 +1,37 @@
+{
+  "title": "mobile-ai-toolkit: on-device AI for React Native",
+  "description": "<p>A React Native TurboModule binding to the on-device AI frameworks both mobile platforms already ship: Apple Vision, NaturalLanguage, Speech and Foundation Models on iOS, and Google ML Kit including ML Kit GenAI on Android. Inference runs on the device; the package contains no network path, enforced by a build gate rather than asserted.</p><p>Its distinguishing concern is honest availability. Both platforms expose per-feature signals &mdash; ML Kit's <code>checkFeatureStatus()</code> and Apple's <code>SystemLanguageModel.availability</code> &mdash; and both are commonly discarded in favour of boolean flags reporting whether classes were linked rather than whether a device can run them. This package surfaces the platform signals directly, with a reason and a permanence distinction, so an application can tell &quot;not yet&quot; from &quot;never here&quot;.</p><p>Built to the <a href=\"https://openslm.ai/accord\">Open Small Models Accord</a>. Under the Accord's LWD-R disclosure layers this release is <strong>Logic only</strong>: inference and routing code, and no weights, training data, or representational schema of its own. It provides inference forkability, not training forkability, and the models it binds to are closed runtimes on proprietary hardware.</p>",
+  "upload_type": "software",
+  "license": "MIT",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Aravind, Anivar A",
+      "orcid": "0009-0009-8995-0005",
+      "affiliation": "OpenSLM"
+    }
+  ],
+  "keywords": [
+    "on-device AI",
+    "small language models",
+    "react-native",
+    "turbomodule",
+    "edge inference",
+    "local-first",
+    "Apple Foundation Models",
+    "ML Kit GenAI",
+    "Open Small Models Accord"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://openslm.ai/accord",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-standard"
+    },
+    {
+      "identifier": "https://www.npmjs.com/package/@anivar/mobile-ai-toolkit",
+      "relation": "isIdenticalTo",
+      "resource_type": "software"
+    }
+  ]
+}

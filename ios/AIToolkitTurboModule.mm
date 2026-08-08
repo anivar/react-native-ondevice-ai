@@ -31,7 +31,7 @@ RCT_EXPORT_MODULE()
 #pragma mark - Device Capabilities
 
 RCT_EXPORT_METHOD(getDeviceCapabilities:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NSMutableDictionary *capabilities = [NSMutableDictionary dictionary];
     capabilities[@"platform"] = @"ios";
@@ -40,55 +40,92 @@ RCT_EXPORT_METHOD(getDeviceCapabilities:(RCTPromiseResolveBlock)resolve
     capabilities[@"hasMLKitGenAI"] = @NO;
     capabilities[@"hasGeminiNano"] = @NO;
 
-    BOOL hasFoundationModels = NO;
+    // Generative availability, straight from SystemLanguageModel.availability.
+    //
+    // The WTWritingToolsCoordinator fallback that used to sit here is gone. It
+    // asked whether the WritingTools class exists, which is true on every iOS
+    // 18.1 device regardless of whether that device is Apple-Intelligence
+    // eligible or has the feature switched on. hasAppleIntelligence — and with
+    // it four generative feature flags — therefore read YES on hardware where
+    // every generative call rejects.
+    NSString *genState = @"unavailable";
+    NSString *genReason = @"os-too-old";
+    NSString *genDetail = @"Foundation Models requires iOS 26 or later.";
 #if AI_HAS_FOUNDATION_BRIDGE
     if (@available(iOS 26.0, *)) {
-        hasFoundationModels = [AIToolkitFoundationModels isAvailable];
+        genState = [AIToolkitFoundationModels availabilityState];
+        genReason = [AIToolkitFoundationModels availabilityReason];
+        genDetail = [AIToolkitFoundationModels unavailableReason];
     }
 #endif
-    BOOL hasAppleIntelligence = hasFoundationModels;
-    if (@available(iOS 18.1, *)) {
-        if (!hasAppleIntelligence) {
-            hasAppleIntelligence = NSClassFromString(@"WTWritingToolsCoordinator") != nil;
-        }
-    }
-    capabilities[@"hasAppleIntelligence"] = @(hasAppleIntelligence);
+    BOOL hasFoundationModels = [genState isEqualToString:@"available"];
+    capabilities[@"hasAppleIntelligence"] = @(hasFoundationModels);
 
-    if (@available(iOS 13.0, *)) {
-        capabilities[@"hasOnDeviceSpeech"] = @([SFSpeechRecognizer supportsOnDeviceRecognition]);
-    } else {
-        capabilities[@"hasOnDeviceSpeech"] = @NO;
-    }
+    // supportsOnDeviceRecognition is an instance property, not a class method,
+    // and it is per-locale: a device can have an offline model for one language
+    // and not another. Probing the current locale is the honest answer for a
+    // capability check.
+    SFSpeechRecognizer *speechProbe =
+        [[SFSpeechRecognizer alloc] initWithLocale:[NSLocale currentLocale]];
+    BOOL hasOnDeviceSpeech = speechProbe != nil && speechProbe.supportsOnDeviceRecognition;
+    capabilities[@"hasOnDeviceSpeech"] = @(hasOnDeviceSpeech);
 
-    capabilities[@"supportedLanguages"] = [NLLanguageRecognizer supportedLanguages] ?: @[];
-
-    BOOL hasContextualEmbedding = NO;
-    if (@available(iOS 17.0, *)) {
-        hasContextualEmbedding = YES;
+    // NLLanguageRecognizer has no +supportedLanguages. The language list that
+    // actually means something here is the set of locales speech recognition
+    // supports — the only language-bound feature on this platform.
+    NSMutableArray<NSString *> *languages = [NSMutableArray array];
+    for (NSLocale *locale in [SFSpeechRecognizer supportedLocales]) {
+        [languages addObject:locale.localeIdentifier];
     }
-    BOOL hasPersonSegmentation = NO;
-    if (@available(iOS 15.0, *)) {
-        hasPersonSegmentation = YES;
-    }
+    [languages sortUsingSelector:@selector(compare:)];
+    capabilities[@"supportedLanguages"] = languages;
 
-    capabilities[@"features"] = @{
-        @"analyzeText": @YES,
-        @"analyzeImage": @YES,
-        @"proofread": @YES,
-        @"summarize": @(hasFoundationModels),
-        @"rewrite": @(hasFoundationModels),
-        @"generate": @(hasFoundationModels),
-        @"chat": @(hasFoundationModels),
-        @"smartReplies": @NO,
-        @"extractEntities": @YES,
-        @"embedText": @(hasContextualEmbedding),
-        @"translate": @NO,
-        @"transcribe": capabilities[@"hasOnDeviceSpeech"],
-        @"scanBarcodes": @YES,
-        @"labelImage": @YES,
-        @"describeImage": @NO,
-        @"segmentPerson": @(hasPersonSegmentation)
+    NSDictionary *(^ok)(void) = ^NSDictionary *{
+        return @{ @"state": @"available", @"requiresNetwork": @NO };
     };
+    NSDictionary *(^no)(NSString *, NSString *) = ^NSDictionary *(NSString *reason, NSString *detail) {
+        return @{ @"state": @"unavailable", @"reason": reason,
+                  @"detail": detail, @"requiresNetwork": @NO };
+    };
+
+    // The generative six share one answer, and it carries its own reason.
+    NSDictionary *gen = hasFoundationModels
+        ? ok()
+        : @{ @"state": genState, @"reason": genReason,
+             @"detail": genDetail, @"requiresNetwork": @NO };
+
+    // `@available` is only valid as an if-condition, not inside an expression.
+    // embedText (iOS 17+) and segmentPerson (iOS 15+) are both below the 17.0
+    // deployment target, so they are simply present. The guards and their
+    // unreachable `unavailable` branches are gone.
+    NSDictionary *transcribe = hasOnDeviceSpeech
+        ? ok()
+        : no(@"hardware-ineligible",
+             @"This device has no on-device speech recognition for the current locale.");
+
+    NSDictionary *availability = @{
+        @"analyzeText": ok(),
+        @"analyzeImage": ok(),
+        @"proofread": ok(),          // UITextChecker, spelling only — always present
+        @"extractEntities": ok(),
+        @"scanBarcodes": ok(),
+        @"labelImage": ok(),
+        @"segmentPerson": ok(),
+        @"embedText": ok(),
+        @"transcribe": transcribe,
+        @"summarize": gen,
+        @"rewrite": gen,
+        @"generate": gen,
+        @"chat": gen,
+        @"describeImage": no(@"no-platform-api",
+                             @"iOS has no on-device image captioning API."),
+        @"smartReplies": no(@"no-platform-api",
+                            @"iOS has no public smart-reply API."),
+        @"translate": no(@"no-platform-api",
+                         @"The Translation framework has no on-device string API."),
+    };
+    capabilities[@"availability"] = availability;
+
 
     resolve(capabilities);
 }
@@ -104,51 +141,48 @@ static NSString *entityTypeFromTag(NLTag tag) {
 
 RCT_EXPORT_METHOD(analyzeText:(NSString *)text
                  options:(NSDictionary *)options
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     if (text.length == 0) {
         reject(@"INVALID_INPUT", @"Text cannot be empty", nil);
         return;
     }
-    if (@available(iOS 13.0, *)) {
-        NSMutableDictionary *result = [NSMutableDictionary dictionary];
+    NSMutableDictionary *result = [NSMutableDictionary dictionary];
 
-        NLLanguageRecognizer *recognizer = [[NLLanguageRecognizer alloc] init];
-        [recognizer processString:text];
-        NLLanguage dominantLanguage = [recognizer dominantLanguage];
-        result[@"language"] = dominantLanguage ?: @"unknown";
-        NSDictionary<NLLanguage, NSNumber *> *hypotheses = [recognizer languageHypothesesWithMaximum:1];
-        result[@"confidence"] = hypotheses[dominantLanguage] ?: @0.0;
+    NLLanguageRecognizer *recognizer = [[NLLanguageRecognizer alloc] init];
+    [recognizer processString:text];
+    NLLanguage dominantLanguage = [recognizer dominantLanguage];
+    result[@"language"] = dominantLanguage ?: @"unknown";
+    NSDictionary<NLLanguage, NSNumber *> *hypotheses = [recognizer languageHypothesesWithMaximum:1];
+    result[@"confidence"] = hypotheses[dominantLanguage] ?: @0.0;
 
-        if ([options[@"includeSentiment"] boolValue]) {
-            NLTagger *tagger = [[NLTagger alloc] initWithTagSchemes:@[NLTagSchemeSentimentScore]];
-            tagger.string = text;
-            NLTag sentimentTag = [tagger tagAtIndex:0
-                                              unit:NLTokenUnitDocument
-                                            scheme:NLTagSchemeSentimentScore
-                                        tokenRange:nil];
-            result[@"sentiment"] = sentimentTag ? @([sentimentTag doubleValue]) : @0.0;
-        }
-
-        if ([options[@"includeEntities"] boolValue]) {
-            result[@"entities"] = [self extractEntitiesSync:text];
-        }
-
-        resolve(result);
-    } else {
-        reject(@"UNSUPPORTED_OS", @"Requires iOS 13.0+", nil);
+    if ([options[@"includeSentiment"] boolValue]) {
+        NLTagger *tagger = [[NLTagger alloc] initWithTagSchemes:@[NLTagSchemeSentimentScore]];
+        tagger.string = text;
+        NLTag sentimentTag = [tagger tagAtIndex:0
+                                          unit:NLTokenUnitDocument
+                                        scheme:NLTagSchemeSentimentScore
+                                    tokenRange:nil];
+        result[@"sentiment"] = sentimentTag ? @([sentimentTag doubleValue]) : @0.0;
     }
+
+    if ([options[@"includeEntities"] boolValue]) {
+        result[@"entities"] = [self extractEntitiesSync:text];
+    }
+
+    resolve(result);
+    
 }
 
-- (NSArray *)extractEntitiesSync:(NSString *)text API_AVAILABLE(ios(13.0)) {
+- (NSArray *)extractEntitiesSync:(NSString *)text {
     NLTagger *tagger = [[NLTagger alloc] initWithTagSchemes:@[NLTagSchemeNameType]];
     tagger.string = text;
     NSMutableArray *entities = [NSMutableArray array];
     NSRange range = NSMakeRange(0, text.length);
-    NLTaggerOptions opts = NLTaggerOptionsOmitWhitespace |
-                           NLTaggerOptionsOmitPunctuation |
-                           NLTaggerOptionsJoinNames;
+    NLTaggerOptions opts = NLTaggerOmitWhitespace |
+                           NLTaggerOmitPunctuation |
+                           NLTaggerJoinNames;
     [tagger enumerateTagsInRange:range
                             unit:NLTokenUnitWord
                           scheme:NLTagSchemeNameType
@@ -167,19 +201,16 @@ RCT_EXPORT_METHOD(analyzeText:(NSString *)text
 }
 
 RCT_EXPORT_METHOD(extractEntities:(NSString *)text
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
-    if (@available(iOS 13.0, *)) {
-        resolve([self extractEntitiesSync:text]);
-    } else {
-        reject(@"UNSUPPORTED_OS", @"Requires iOS 13.0+", nil);
-    }
+    resolve([self extractEntitiesSync:text]);
+    
 }
 
 RCT_EXPORT_METHOD(identifyLanguage:(NSString *)text
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NLLanguageRecognizer *recognizer = [[NLLanguageRecognizer alloc] init];
     [recognizer processString:text];
@@ -190,8 +221,8 @@ RCT_EXPORT_METHOD(identifyLanguage:(NSString *)text
 
 RCT_EXPORT_METHOD(analyzeImage:(NSString *)imageBase64
                  options:(NSDictionary *)options
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NSData *imageData = [[NSData alloc] initWithBase64EncodedString:imageBase64
                                                             options:NSDataBase64DecodingIgnoreUnknownCharacters];
@@ -252,31 +283,15 @@ RCT_EXPORT_METHOD(analyzeImage:(NSString *)imageBase64
         [requests addObject:faceRequest];
     }
 
-    if ([options[@"detectObjects"] boolValue]) {
-        if (@available(iOS 17.0, *)) {
-            dispatch_group_enter(group);
-            VNGenerateForegroundInstanceMaskRequest *maskRequest = [[VNGenerateForegroundInstanceMaskRequest alloc] initWithCompletionHandler:^(VNRequest *req, NSError *error) {
-                if (!error) {
-                    NSMutableArray *objects = [NSMutableArray array];
-                    for (VNInstanceMaskObservation *obs in req.results) {
-                        [objects addObject:@{
-                            @"label": @"foreground",
-                            @"confidence": @(obs.confidence),
-                            @"bounds": @{
-                                @"x": @(obs.boundingBox.origin.x * image.size.width),
-                                @"y": @(obs.boundingBox.origin.y * image.size.height),
-                                @"width": @(obs.boundingBox.size.width * image.size.width),
-                                @"height": @(obs.boundingBox.size.height * image.size.height)
-                            }
-                        }];
-                    }
-                    result[@"objects"] = objects;
-                }
-                dispatch_group_leave(group);
-            }];
-            [requests addObject:maskRequest];
-        }
-    }
+    // No object detection on iOS. Vision has no general-purpose object
+    // detector, and VNGenerateForegroundInstanceMaskRequest — which was used
+    // here — returns VNInstanceMaskObservation, which has no boundingBox to
+    // build an ImageAnalysis.object from. It segments foreground; it does not
+    // say what the foreground is.
+    //
+    // `objects` therefore stays empty on iOS and is populated by ML Kit on
+    // Android. getDeviceCapabilities reports this difference rather than
+    // hiding it.
 
     if (requests.count == 0) {
         resolve(result);
@@ -296,8 +311,8 @@ RCT_EXPORT_METHOD(analyzeImage:(NSString *)imageBase64
 #pragma mark - Proofread
 
 RCT_EXPORT_METHOD(proofreadText:(NSString *)text
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     UITextChecker *checker = [[UITextChecker alloc] init];
     NSMutableArray *corrections = [NSMutableArray array];
@@ -346,14 +361,6 @@ RCT_EXPORT_METHOD(proofreadText:(NSString *)text
 // the Foundation Models bridge (AIToolkitFoundationModels.swift). Otherwise
 // they reject FEATURE_UNAVAILABLE / UNSUPPORTED_PLATFORM with a precise reason.
 
-static BOOL AI_FoundationModelsAvailable(void) {
-#if AI_HAS_FOUNDATION_BRIDGE
-    if (@available(iOS 26.0, *)) {
-        return [AIToolkitFoundationModels isAvailable];
-    }
-#endif
-    return NO;
-}
 
 static NSString *AI_FoundationModelsUnavailableReason(void) {
 #if AI_HAS_FOUNDATION_BRIDGE
@@ -366,8 +373,8 @@ static NSString *AI_FoundationModelsUnavailableReason(void) {
 
 RCT_EXPORT_METHOD(summarizeText:(NSString *)text
                  format:(NSString *)format
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     if (text.length == 0) {
         reject(@"INVALID_INPUT", @"Text cannot be empty", nil);
@@ -389,8 +396,8 @@ RCT_EXPORT_METHOD(summarizeText:(NSString *)text
 
 RCT_EXPORT_METHOD(rewriteText:(NSString *)text
                  style:(NSString *)style
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     if (text.length == 0) {
         reject(@"INVALID_INPUT", @"Text cannot be empty", nil);
@@ -411,8 +418,8 @@ RCT_EXPORT_METHOD(rewriteText:(NSString *)text
 }
 
 RCT_EXPORT_METHOD(smartReplies:(NSArray *)messages
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     reject(@"UNSUPPORTED_PLATFORM",
            @"Smart Reply is not available on iOS (Android-only via ML Kit).",
@@ -422,8 +429,8 @@ RCT_EXPORT_METHOD(smartReplies:(NSArray *)messages
 RCT_EXPORT_METHOD(translateText:(NSString *)text
                  sourceLang:(NSString *)sourceLang
                  targetLang:(NSString *)targetLang
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     reject(@"UNSUPPORTED_PLATFORM",
            @"iOS Translation framework requires SwiftUI host integration; tracked for v2.2. On Android use ML Kit Translator.",
@@ -432,8 +439,8 @@ RCT_EXPORT_METHOD(translateText:(NSString *)text
 
 RCT_EXPORT_METHOD(generateText:(NSString *)prompt
                  options:(NSDictionary *)options
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     if (prompt.length == 0) {
         reject(@"INVALID_INPUT", @"Prompt cannot be empty", nil);
@@ -458,8 +465,8 @@ RCT_EXPORT_METHOD(generateText:(NSString *)prompt
 
 RCT_EXPORT_METHOD(chat:(NSArray *)messages
                  options:(NSDictionary *)options
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     if (messages.count == 0) {
         reject(@"INVALID_INPUT", @"chat() requires at least one message.", nil);
@@ -483,8 +490,8 @@ RCT_EXPORT_METHOD(chat:(NSArray *)messages
 }
 
 RCT_EXPORT_METHOD(describeImage:(NSString *)imageBase64
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     reject(@"UNSUPPORTED_PLATFORM",
            @"Apple Intelligence's on-device foundation model is text-only; no public iOS image-description API. Use labelImage() / scanBarcodes() / analyzeImage() for visual data.",
@@ -494,56 +501,56 @@ RCT_EXPORT_METHOD(describeImage:(NSString *)imageBase64
 #pragma mark - Embeddings
 
 RCT_EXPORT_METHOD(embedText:(NSString *)text
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
-    if (@available(iOS 17.0, *)) {
-        NLLanguageRecognizer *rec = [[NLLanguageRecognizer alloc] init];
-        [rec processString:text];
-        NLLanguage lang = [rec dominantLanguage] ?: NLLanguageEnglish;
+    NLLanguageRecognizer *rec = [[NLLanguageRecognizer alloc] init];
+    [rec processString:text];
+    NLLanguage lang = [rec dominantLanguage] ?: NLLanguageEnglish;
 
-        NLContextualEmbedding *embedding = [NLContextualEmbedding contextualEmbeddingWithLanguage:lang];
-        if (!embedding) {
-            reject(@"EMBEDDING_UNAVAILABLE",
-                   [NSString stringWithFormat:@"No contextual embedding available for language %@", lang], nil);
+    NLContextualEmbedding *embedding = [NLContextualEmbedding contextualEmbeddingWithLanguage:lang];
+    if (!embedding) {
+        reject(@"EMBEDDING_UNAVAILABLE",
+               [NSString stringWithFormat:@"No contextual embedding available for language %@", lang], nil);
+        return;
+    }
+
+    // There is no `isLoaded`. Loading is idempotent, so attempt it and treat
+    // failure as "assets are probably missing", which is the only recoverable
+    // case anyway.
+    NSError *loadError = nil;
+    {
+        BOOL ok = [embedding loadWithError:&loadError];
+        if (!ok) {
+            if (![embedding hasAvailableAssets]) {
+                [embedding requestEmbeddingAssetsWithCompletionHandler:^(NLContextualEmbeddingAssetsResult result, NSError *err) {
+                    if (result == NLContextualEmbeddingAssetsResultAvailable) {
+                        NSError *retryErr = nil;
+                        if ([embedding loadWithError:&retryErr]) {
+                            [self computeAndResolveEmbedding:embedding text:text resolve:resolve reject:reject];
+                        } else {
+                            reject(@"EMBEDDING_LOAD_FAILED", retryErr.localizedDescription ?: @"unknown", retryErr);
+                        }
+                    } else {
+                        reject(@"EMBEDDING_ASSETS_UNAVAILABLE",
+                               err.localizedDescription ?: @"Asset download failed", err);
+                    }
+                }];
+            } else {
+                reject(@"EMBEDDING_LOAD_FAILED", loadError.localizedDescription ?: @"unknown", loadError);
+            }
             return;
         }
-
-        NSError *loadError = nil;
-        if (!embedding.isLoaded) {
-            BOOL ok = [embedding loadWithError:&loadError];
-            if (!ok) {
-                if (![embedding hasAvailableAssets]) {
-                    [embedding requestAssets:^(NLContextualEmbeddingAssetsResult result, NSError *err) {
-                        if (result == NLContextualEmbeddingAssetsResultAvailable) {
-                            NSError *retryErr = nil;
-                            if ([embedding loadWithError:&retryErr]) {
-                                [self computeAndResolveEmbedding:embedding text:text resolve:resolve reject:reject];
-                            } else {
-                                reject(@"EMBEDDING_LOAD_FAILED", retryErr.localizedDescription ?: @"unknown", retryErr);
-                            }
-                        } else {
-                            reject(@"EMBEDDING_ASSETS_UNAVAILABLE",
-                                   err.localizedDescription ?: @"Asset download failed", err);
-                        }
-                    }];
-                } else {
-                    reject(@"EMBEDDING_LOAD_FAILED", loadError.localizedDescription ?: @"unknown", loadError);
-                }
-                return;
-            }
-        }
-
-        [self computeAndResolveEmbedding:embedding text:text resolve:resolve reject:reject];
-    } else {
-        reject(@"UNSUPPORTED_OS", @"NLContextualEmbedding requires iOS 17.0+", nil);
     }
+
+    [self computeAndResolveEmbedding:embedding text:text resolve:resolve reject:reject];
+    
 }
 
 - (void)computeAndResolveEmbedding:(NLContextualEmbedding *)embedding
                               text:(NSString *)text
                            resolve:(RCTPromiseResolveBlock)resolve
-                            reject:(RCTPromiseRejectBlock)reject API_AVAILABLE(ios(17.0))
+                            reject:(RCTPromiseRejectBlock)reject
 {
     NSError *err = nil;
     NLContextualEmbeddingResult *result = [embedding embeddingResultForString:text language:nil error:&err];
@@ -551,16 +558,33 @@ RCT_EXPORT_METHOD(embedText:(NSString *)text
         reject(@"EMBEDDING_ERROR", err.localizedDescription ?: @"Failed to compute embedding", err);
         return;
     }
-    NSMutableArray<NSNumber *> *vector = [NSMutableArray array];
-    NSUInteger dim = result.embeddingArray.firstObject.count;
-    for (NSUInteger i = 0; i < dim; i++) {
-        double sum = 0.0;
-        NSUInteger n = 0;
-        for (NSArray<NSNumber *> *tokenVec in result.embeddingArray) {
-            sum += [tokenVec[i] doubleValue];
-            n++;
+    // NLContextualEmbeddingResult has no `embeddingArray`. Token vectors are
+    // enumerated, so mean-pool over them in one pass: a per-token embedding is
+    // not what a caller asking for "the embedding of this string" wants, and
+    // mean pooling is the conventional reduction.
+    NSUInteger dimension = embedding.dimension;
+    NSMutableArray<NSNumber *> *sums = [NSMutableArray arrayWithCapacity:dimension];
+    for (NSUInteger i = 0; i < dimension; i++) {
+        [sums addObject:@0.0];
+    }
+
+    __block NSUInteger tokenCount = 0;
+    [result enumerateTokenVectorsInRange:NSMakeRange(0, text.length)
+                              usingBlock:^(NSArray<NSNumber *> *tokenVector, NSRange tokenRange, BOOL *stop) {
+        for (NSUInteger i = 0; i < dimension && i < tokenVector.count; i++) {
+            sums[i] = @(sums[i].doubleValue + tokenVector[i].doubleValue);
         }
-        [vector addObject:@(n > 0 ? sum / n : 0.0)];
+        tokenCount++;
+    }];
+
+    if (tokenCount == 0) {
+        reject(@"EMBEDDING_ERROR", @"The model returned no token vectors for this text", nil);
+        return;
+    }
+
+    NSMutableArray<NSNumber *> *vector = [NSMutableArray arrayWithCapacity:dimension];
+    for (NSUInteger i = 0; i < dimension; i++) {
+        [vector addObject:@(sums[i].doubleValue / (double)tokenCount)];
     }
     resolve(vector);
 }
@@ -568,8 +592,8 @@ RCT_EXPORT_METHOD(embedText:(NSString *)text
 #pragma mark - Vision (extras)
 
 RCT_EXPORT_METHOD(scanBarcodes:(NSString *)imageBase64
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
                                                        options:NSDataBase64DecodingIgnoreUnknownCharacters];
@@ -606,156 +630,207 @@ RCT_EXPORT_METHOD(scanBarcodes:(NSString *)imageBase64
 }
 
 RCT_EXPORT_METHOD(labelImage:(NSString *)imageBase64
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
-    if (@available(iOS 13.0, *)) {
-        NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
-                                                           options:NSDataBase64DecodingIgnoreUnknownCharacters];
-        UIImage *image = [UIImage imageWithData:data];
-        if (!image || !image.CGImage) {
-            reject(@"INVALID_IMAGE", @"Failed to decode image", nil);
-            return;
-        }
-        CIImage *ciImage = [CIImage imageWithCGImage:image.CGImage];
-        VNClassifyImageRequest *req = [[VNClassifyImageRequest alloc] initWithCompletionHandler:^(VNRequest *r, NSError *error) {
-            if (error) { reject(@"LABEL_ERROR", error.localizedDescription, error); return; }
-            NSMutableArray *out = [NSMutableArray array];
-            for (VNClassificationObservation *obs in r.results) {
-                if (obs.confidence < 0.1f) continue;
-                [out addObject:@{ @"label": obs.identifier, @"confidence": @(obs.confidence) }];
-                if (out.count >= 10) break;
-            }
-            resolve(out);
-        }];
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-            VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCIImage:ciImage options:@{}];
-            NSError *err = nil;
-            if (![handler performRequests:@[req] error:&err]) {
-                reject(@"LABEL_HANDLER_ERROR", err.localizedDescription ?: @"failed", err);
-            }
-        });
-    } else {
-        reject(@"UNSUPPORTED_OS", @"Image labeling requires iOS 13.0+", nil);
+    NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
+                                                       options:NSDataBase64DecodingIgnoreUnknownCharacters];
+    UIImage *image = [UIImage imageWithData:data];
+    if (!image || !image.CGImage) {
+        reject(@"INVALID_IMAGE", @"Failed to decode image", nil);
+        return;
     }
+    CIImage *ciImage = [CIImage imageWithCGImage:image.CGImage];
+    VNClassifyImageRequest *req = [[VNClassifyImageRequest alloc] initWithCompletionHandler:^(VNRequest *r, NSError *error) {
+        if (error) { reject(@"LABEL_ERROR", error.localizedDescription, error); return; }
+        NSMutableArray *out = [NSMutableArray array];
+        for (VNClassificationObservation *obs in r.results) {
+            if (obs.confidence < 0.1f) continue;
+            [out addObject:@{ @"label": obs.identifier, @"confidence": @(obs.confidence) }];
+            if (out.count >= 10) break;
+        }
+        resolve(out);
+    }];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCIImage:ciImage options:@{}];
+        NSError *err = nil;
+        if (![handler performRequests:@[req] error:&err]) {
+            reject(@"LABEL_HANDLER_ERROR", err.localizedDescription ?: @"failed", err);
+        }
+    });
+    
 }
 
 RCT_EXPORT_METHOD(segmentPerson:(NSString *)imageBase64
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
-    if (@available(iOS 15.0, *)) {
-        NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
-                                                           options:NSDataBase64DecodingIgnoreUnknownCharacters];
-        UIImage *image = [UIImage imageWithData:data];
-        if (!image || !image.CGImage) {
-            reject(@"INVALID_IMAGE", @"Failed to decode image", nil);
-            return;
-        }
-        CIImage *ciImage = [CIImage imageWithCGImage:image.CGImage];
-        VNGeneratePersonSegmentationRequest *req = [[VNGeneratePersonSegmentationRequest alloc] initWithCompletionHandler:^(VNRequest *r, NSError *error) {
-            if (error) { reject(@"SEGMENT_ERROR", error.localizedDescription, error); return; }
-            VNPixelBufferObservation *obs = r.results.firstObject;
-            if (!obs) { reject(@"SEGMENT_NO_RESULT", @"No segmentation result", nil); return; }
-            CVPixelBufferRef buffer = obs.pixelBuffer;
-            CIImage *maskImage = [CIImage imageWithCVPixelBuffer:buffer];
-            CIContext *ctx = [CIContext context];
-            size_t w = CVPixelBufferGetWidth(buffer);
-            size_t h = CVPixelBufferGetHeight(buffer);
-            CGImageRef cgImage = [ctx createCGImage:maskImage fromRect:CGRectMake(0, 0, w, h)];
-            if (!cgImage) { reject(@"SEGMENT_RENDER_FAILED", @"Could not render mask", nil); return; }
-            UIImage *uiMask = [UIImage imageWithCGImage:cgImage];
-            CGImageRelease(cgImage);
-            NSData *pngData = UIImagePNGRepresentation(uiMask);
-            NSString *b64 = [pngData base64EncodedStringWithOptions:0];
-            resolve(@{
-                @"maskBase64": b64 ?: @"",
-                @"width": @(w),
-                @"height": @(h)
-            });
-        }];
-        req.qualityLevel = VNGeneratePersonSegmentationRequestQualityLevelBalanced;
-        req.outputPixelFormat = kCVPixelFormatType_OneComponent8;
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-            VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCIImage:ciImage options:@{}];
-            NSError *err = nil;
-            if (![handler performRequests:@[req] error:&err]) {
-                reject(@"SEGMENT_HANDLER_ERROR", err.localizedDescription ?: @"failed", err);
-            }
-        });
-    } else {
-        reject(@"UNSUPPORTED_OS", @"Person segmentation requires iOS 15.0+", nil);
+    NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
+                                                       options:NSDataBase64DecodingIgnoreUnknownCharacters];
+    UIImage *image = [UIImage imageWithData:data];
+    if (!image || !image.CGImage) {
+        reject(@"INVALID_IMAGE", @"Failed to decode image", nil);
+        return;
     }
+    CIImage *ciImage = [CIImage imageWithCGImage:image.CGImage];
+    VNGeneratePersonSegmentationRequest *req = [[VNGeneratePersonSegmentationRequest alloc] initWithCompletionHandler:^(VNRequest *r, NSError *error) {
+        if (error) { reject(@"SEGMENT_ERROR", error.localizedDescription, error); return; }
+        VNPixelBufferObservation *obs = r.results.firstObject;
+        if (!obs) { reject(@"SEGMENT_NO_RESULT", @"No segmentation result", nil); return; }
+        CVPixelBufferRef buffer = obs.pixelBuffer;
+        CIImage *maskImage = [CIImage imageWithCVPixelBuffer:buffer];
+        CIContext *ctx = [CIContext context];
+        size_t w = CVPixelBufferGetWidth(buffer);
+        size_t h = CVPixelBufferGetHeight(buffer);
+        CGImageRef cgImage = [ctx createCGImage:maskImage fromRect:CGRectMake(0, 0, w, h)];
+        if (!cgImage) { reject(@"SEGMENT_RENDER_FAILED", @"Could not render mask", nil); return; }
+        UIImage *uiMask = [UIImage imageWithCGImage:cgImage];
+        CGImageRelease(cgImage);
+        NSData *pngData = UIImagePNGRepresentation(uiMask);
+        NSString *b64 = [pngData base64EncodedStringWithOptions:0];
+        resolve(@{
+            @"maskBase64": b64 ?: @"",
+            @"width": @(w),
+            @"height": @(h)
+        });
+    }];
+    req.qualityLevel = VNGeneratePersonSegmentationRequestQualityLevelBalanced;
+    req.outputPixelFormat = kCVPixelFormatType_OneComponent8;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCIImage:ciImage options:@{}];
+        NSError *err = nil;
+        if (![handler performRequests:@[req] error:&err]) {
+            reject(@"SEGMENT_HANDLER_ERROR", err.localizedDescription ?: @"failed", err);
+        }
+    });
+    
 }
 
 #pragma mark - Speech (real, on-device)
 
 RCT_EXPORT_METHOD(transcribeAudioFile:(NSString *)filePath
                  options:(NSDictionary *)options
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
-    if (@available(iOS 13.0, *)) {
-        NSString *localeId = options[@"locale"] ?: @"en-US";
-        NSLocale *locale = [NSLocale localeWithLocaleIdentifier:localeId];
-        SFSpeechRecognizer *recognizer = [[SFSpeechRecognizer alloc] initWithLocale:locale];
-        if (!recognizer) {
-            reject(@"UNSUPPORTED_LOCALE", [NSString stringWithFormat:@"Locale %@ is not supported", localeId], nil);
-            return;
-        }
-        if (!recognizer.isAvailable) {
-            reject(@"RECOGNIZER_UNAVAILABLE", @"Speech recognizer is not currently available", nil);
-            return;
-        }
-        if (![SFSpeechRecognizer supportsOnDeviceRecognition]) {
-            reject(@"ON_DEVICE_UNSUPPORTED", @"On-device recognition not supported on this device", nil);
-            return;
-        }
-
-        NSURL *url = [NSURL fileURLWithPath:filePath];
-        if (![[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
-            reject(@"FILE_NOT_FOUND", [NSString stringWithFormat:@"Audio file not found: %@", filePath], nil);
-            return;
-        }
-
-        SFSpeechURLRecognitionRequest *request = [[SFSpeechURLRecognitionRequest alloc] initWithURL:url];
-        request.requiresOnDeviceRecognition = YES;
-        request.shouldReportPartialResults = NO;
-        if ([options[@"enablePunctuation"] boolValue]) {
-            if (@available(iOS 16.0, *)) {
-                request.addsPunctuation = YES;
+    // Speech recognition needs the user's permission before anything else works.
+    // Without this call SFSpeechRecognizer.isAvailable is NO, so every request
+    // failed as RECOGNIZER_UNAVAILABLE — which reads as "your device cannot do
+    // this" when the truth is "nobody has been asked yet". Authorization is
+    // required even with requiresOnDeviceRecognition = YES.
+    //
+    // Your app needs NSSpeechRecognitionUsageDescription in its Info.plist; iOS
+    // terminates the process on the first request if it is missing.
+    [SFSpeechRecognizer requestAuthorization:^(SFSpeechRecognizerAuthorizationStatus status) {
+        // The callback is not guaranteed to be on the main queue, and the work
+        // below touches nothing thread-confined, but the promise blocks are
+        // safest resolved off a known queue.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            switch (status) {
+                case SFSpeechRecognizerAuthorizationStatusAuthorized:
+                    break;
+                case SFSpeechRecognizerAuthorizationStatusDenied:
+                    reject(@"SPEECH_PERMISSION_DENIED",
+                           @"The user declined speech recognition. It can be re-enabled "
+                           @"in Settings > Privacy & Security > Speech Recognition.", nil);
+                    return;
+                case SFSpeechRecognizerAuthorizationStatusRestricted:
+                    reject(@"SPEECH_PERMISSION_RESTRICTED",
+                           @"Speech recognition is restricted on this device, most often "
+                           @"by parental controls or an MDM policy.", nil);
+                    return;
+                case SFSpeechRecognizerAuthorizationStatusNotDetermined:
+                default:
+                    reject(@"SPEECH_PERMISSION_DENIED",
+                           @"Speech recognition authorization was not granted.", nil);
+                    return;
             }
-        }
+            [self transcribeAuthorized:filePath options:options resolve:resolve reject:reject];
+        });
+    }];
+}
 
-        [recognizer recognitionTaskWithRequest:request resultHandler:^(SFSpeechRecognitionResult *result, NSError *error) {
-            if (error) {
-                reject(@"RECOGNITION_ERROR", error.localizedDescription, error);
-                return;
-            }
-            if (result.isFinal) {
-                SFTranscription *best = result.bestTranscription;
-                float avgConfidence = 0.0f;
-                if (best.segments.count > 0) {
-                    float sum = 0.0f;
-                    for (SFTranscriptionSegment *seg in best.segments) sum += seg.confidence;
-                    avgConfidence = sum / best.segments.count;
-                }
-                resolve(@{
-                    @"text": best.formattedString ?: @"",
-                    @"confidence": @(avgConfidence),
-                    @"locale": localeId
-                });
-            }
-        }];
-    } else {
-        reject(@"UNSUPPORTED_OS", @"Speech recognition requires iOS 13.0+", nil);
+- (void)transcribeAuthorized:(NSString *)filePath
+                     options:(NSDictionary *)options
+                    resolve:(RCTPromiseResolveBlock)resolve
+                    reject:(RCTPromiseRejectBlock)reject
+{
+    NSString *localeId = options[@"locale"] ?: @"en-US";
+    NSLocale *locale = [NSLocale localeWithLocaleIdentifier:localeId];
+    SFSpeechRecognizer *recognizer = [[SFSpeechRecognizer alloc] initWithLocale:locale];
+    if (!recognizer) {
+        reject(@"UNSUPPORTED_LOCALE", [NSString stringWithFormat:@"Locale %@ is not supported", localeId], nil);
+        return;
     }
+    if (!recognizer.isAvailable) {
+        reject(@"RECOGNIZER_UNAVAILABLE", @"Speech recognizer is not currently available", nil);
+        return;
+    }
+    // Instance property, and per-locale: this recognizer, for this language.
+    if (!recognizer.supportsOnDeviceRecognition) {
+        reject(@"ON_DEVICE_UNSUPPORTED",
+               [NSString stringWithFormat:
+                @"On-device recognition is not available for %@ on this device. "
+                @"Another locale may work; this package never falls back to Apple's servers.",
+                localeId],
+               nil);
+        return;
+    }
+
+    NSURL *url = [NSURL fileURLWithPath:filePath];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
+        reject(@"FILE_NOT_FOUND", [NSString stringWithFormat:@"Audio file not found: %@", filePath], nil);
+        return;
+    }
+
+    SFSpeechURLRecognitionRequest *request = [[SFSpeechURLRecognitionRequest alloc] initWithURL:url];
+    request.requiresOnDeviceRecognition = YES;
+    request.shouldReportPartialResults = NO;
+    if ([options[@"enablePunctuation"] boolValue]) {
+        request.addsPunctuation = YES;
+    }
+
+    [recognizer recognitionTaskWithRequest:request resultHandler:^(SFSpeechRecognitionResult *result, NSError *error) {
+        if (error) {
+            reject(@"RECOGNITION_ERROR", error.localizedDescription, error);
+            return;
+        }
+        if (result.isFinal) {
+            SFTranscription *best = result.bestTranscription;
+            float avgConfidence = 0.0f;
+            if (best.segments.count > 0) {
+                float sum = 0.0f;
+                for (SFTranscriptionSegment *seg in best.segments) sum += seg.confidence;
+                avgConfidence = sum / best.segments.count;
+            }
+            resolve(@{
+                @"text": best.formattedString ?: @"",
+                @"confidence": @(avgConfidence),
+                @"locale": localeId
+            });
+        }
+    }];
+    
 }
 
 #pragma mark - Privacy
 
 static BOOL privateMode = NO;
 
+BOOL AIToolkitPrivateModeEnabled(void) { return privateMode; }
+
+/**
+ * On iOS every framework this module uses runs on-device with no network:
+ * Vision, NaturalLanguage, UITextChecker, Foundation Models, and
+ * SFSpeechRecognizer with requiresOnDeviceRecognition = YES. There is no
+ * download path here as there is on Android, so private mode has nothing to
+ * block on this platform. It is a no-op, and saying so is better than leaving
+ * a stored value that looks like a control.
+ *
+ * The one place it might have mattered — speech recognition falling back to
+ * Apple's servers — is already closed unconditionally, for every caller,
+ * private mode or not.
+ */
 RCT_EXPORT_METHOD(enablePrivateMode:(BOOL)enabled)
 {
     privateMode = enabled;

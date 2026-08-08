@@ -6,14 +6,30 @@
  *  - Android: ML Kit (text, vision, translate, smart reply, entity extraction)
  *             + ML Kit GenAI (summarize/rewrite/proofread, AICore devices only)
  *
- * Methods reject with `UNSUPPORTED_PLATFORM` or `FEATURE_UNAVAILABLE` when
- * the underlying capability is not present. Callers should always check
- * `getDeviceCapabilities()` first or guard with try/catch.
+ * Not every feature exists on both platforms, and that is not a bug to be
+ * papered over: `embedText` is iOS-only, `describeImage` / `smartReplies` /
+ * `translateText` are Android-only. A method that the platform cannot do
+ * rejects with an `AIError` whose `code` is `FEATURE_UNAVAILABLE` and whose
+ * `reason` says why — `no-platform-api` for the list above, `os-too-old` or
+ * `hardware-ineligible` for a device that will never support it,
+ * `model-not-ready` for one that will once a download finishes.
+ *
+ * Importing this module never throws. If the native side is not linked (Expo
+ * Go, react-native-web, the old architecture) the calls reject with
+ * `MODULE_NOT_LINKED` rather than taking the bundle down at import time.
  */
 
-import NativeAIToolkit from './specs/NativeAIToolkitSpec';
+import { call, callSync } from './call';
 
-export type * from './specs/NativeAIToolkitSpec';
+export {
+  AIError,
+  type ErrorCode,
+  ErrorCodes,
+  isAIError,
+  isTransient,
+  type UnavailableReason,
+} from './errors';
+export type * from './specs/NativeAIToolkit';
 
 import type {
   Barcode,
@@ -31,62 +47,62 @@ import type {
   TextAnalysisOptions,
   Transcript,
   TranscriptionOptions,
-} from './specs/NativeAIToolkitSpec';
+} from './specs/NativeAIToolkit';
 
 export function getDeviceCapabilities(): Promise<DeviceCapabilities> {
-  return NativeAIToolkit.getDeviceCapabilities();
+  return call('getDeviceCapabilities', (n) => n.getDeviceCapabilities());
 }
 
 export function analyzeText(
   text: string,
   options: TextAnalysisOptions = {}
 ): Promise<TextAnalysis> {
-  return NativeAIToolkit.analyzeText(text, options);
+  return call('analyzeText', (n) => n.analyzeText(text, options));
 }
 
 export function extractEntities(text: string): Promise<Entity[]> {
-  return NativeAIToolkit.extractEntities(text);
+  return call('extractEntities', (n) => n.extractEntities(text));
 }
 
 export function identifyLanguage(text: string): Promise<string> {
-  return NativeAIToolkit.identifyLanguage(text);
+  return call('identifyLanguage', (n) => n.identifyLanguage(text));
 }
 
 export function embedText(text: string): Promise<number[]> {
-  return NativeAIToolkit.embedText(text);
+  return call('embedText', (n) => n.embedText(text));
 }
 
 export function analyzeImage(
   imageBase64: string,
   options: ImageAnalysisOptions = {}
 ): Promise<ImageAnalysis> {
-  return NativeAIToolkit.analyzeImage(imageBase64, options);
+  return call('analyzeImage', (n) => n.analyzeImage(imageBase64, options));
 }
 
 export function scanBarcodes(imageBase64: string): Promise<Barcode[]> {
-  return NativeAIToolkit.scanBarcodes(imageBase64);
+  return call('scanBarcodes', (n) => n.scanBarcodes(imageBase64));
 }
 
 export function labelImage(imageBase64: string): Promise<ImageLabel[]> {
-  return NativeAIToolkit.labelImage(imageBase64);
+  return call('labelImage', (n) => n.labelImage(imageBase64));
 }
 
 export function describeImage(imageBase64: string): Promise<string> {
-  return NativeAIToolkit.describeImage(imageBase64);
+  return call('describeImage', (n) => n.describeImage(imageBase64));
 }
 
 export function segmentPerson(imageBase64: string): Promise<PersonSegmentationResult> {
-  return NativeAIToolkit.segmentPerson(imageBase64);
+  return call('segmentPerson', (n) => n.segmentPerson(imageBase64));
 }
 
 export function proofreadText(text: string): Promise<ProofreadResult> {
-  return NativeAIToolkit.proofreadText(text);
+  return call('proofreadText', (n) => n.proofreadText(text));
 }
 
 export type SummaryFormat = 'one-bullet' | 'bullets' | 'headline';
 
 export function summarizeText(text: string, format: SummaryFormat = 'bullets'): Promise<string> {
-  return NativeAIToolkit.summarizeText(text, format);
+  return call('summarizeText', (n) => n.summarizeText(text, format));
 }
 
 export type RewriteStyle =
@@ -99,19 +115,19 @@ export type RewriteStyle =
   | 'elaborate';
 
 export function rewriteText(text: string, style: RewriteStyle): Promise<string> {
-  return NativeAIToolkit.rewriteText(text, style);
+  return call('rewriteText', (n) => n.rewriteText(text, style));
 }
 
 export function generateText(prompt: string, options: GenerationOptions = {}): Promise<string> {
-  return NativeAIToolkit.generateText(prompt, options);
+  return call('generateText', (n) => n.generateText(prompt, options));
 }
 
 export function chat(messages: ChatMessage[], options: GenerationOptions = {}): Promise<string> {
-  return NativeAIToolkit.chat(messages, options);
+  return call('chat', (n) => n.chat(messages, options));
 }
 
 export function smartReplies(messages: SmartReplyMessage[]): Promise<string[]> {
-  return NativeAIToolkit.smartReplies(messages);
+  return call('smartReplies', (n) => n.smartReplies(messages));
 }
 
 export function translateText(
@@ -119,20 +135,38 @@ export function translateText(
   sourceLang: string,
   targetLang: string
 ): Promise<string> {
-  return NativeAIToolkit.translateText(text, sourceLang, targetLang);
+  return call('translateText', (n) => n.translateText(text, sourceLang, targetLang));
 }
 
 export function transcribeAudioFile(
   filePath: string,
   options: TranscriptionOptions = {}
 ): Promise<Transcript> {
-  return NativeAIToolkit.transcribeAudioFile(filePath, options);
+  return call('transcribeAudioFile', (n) => n.transcribeAudioFile(filePath, options));
 }
 
+/**
+ * These two are synchronous in the spec, so an unlinked module throws here
+ * rather than rejecting. Nothing else in the API behaves this way.
+ */
 export function enablePrivateMode(enabled: boolean): void {
-  NativeAIToolkit.enablePrivateMode(enabled);
+  callSync('enablePrivateMode', (n) => n.enablePrivateMode(enabled));
 }
 
 export function isPrivateModeEnabled(): boolean {
-  return NativeAIToolkit.isPrivateModeEnabled();
+  return callSync('isPrivateModeEnabled', (n) => n.isPrivateModeEnabled());
 }
+
+export { requireNative } from './call';
+export { type CallExplanation, explainCall } from './explain';
+export {
+  type ExtractiveSummary,
+  summarizeExtractive,
+} from './fallbacks/summarizeExtractive';
+export { configure, resetPolicy, type Tier, type TierPolicy } from './policy';
+export {
+  type Attempt,
+  type SummarizeOptions,
+  type SummarizeResult,
+  summarize,
+} from './summarize';

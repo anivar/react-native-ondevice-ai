@@ -1,7 +1,7 @@
 {
   "name": "@anivar/mobile-ai-toolkit",
-  "version": "2.1.0-rc.5",
-  "description": "On-device AI for React Native. Zero cloud costs. One unified API.",
+  "version": "2.2.0",
+  "description": "On-device AI for React Native. Nothing leaves the device. One API shape, per-platform behaviour, fully disclosed.",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -11,7 +11,8 @@
       "import": "./lib/index.js",
       "require": "./lib/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./app.plugin.js": "./app.plugin.js"
   },
   "sideEffects": false,
   "files": [
@@ -19,8 +20,8 @@
     "src/",
     "ios/",
     "android/",
+    "app.plugin.js",
     "README.md",
-    "SETUP.md",
     "LICENSE",
     "MobileAIToolkit.podspec"
   ],
@@ -66,13 +67,16 @@
   "funding": "https://github.com/sponsors/anivar",
   "peerDependencies": {
     "react": ">=19.0.0",
-    "react-native": ">=0.80.0"
+    "react-native": ">=0.86.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
+    "@expo/config-plugins": "^54.0.0",
     "@types/jest": "^30.0.0",
     "@types/react": "^19.0.0",
     "jest": "^30.3.0",
+    "react": "^19.2.3",
+    "react-native": "0.86.2",
     "ts-jest": "^29.4.4",
     "typescript": "^6.0.3"
   },

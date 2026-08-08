@@ -1,30 +1,53 @@
-# Mobile AI Toolkit Example
+# Mobile AI Toolkit — example
 
-Demonstrates the on-device AI surface in `@anivar/mobile-ai-toolkit`:
+An Expo app that shows what `@anivar/mobile-ai-toolkit` can actually do **on
+your device**, which is the only question that matters for a package like this.
 
-- **Sentiment analysis** — `analyzeText()` (on-device via NaturalLanguage / ML Kit)
-- **Smart replies** — `smartReplies()` (on-device via ML Kit Smart Reply)
-- **Chat** — `chat()` (Apple Foundation Models on iOS 26+, ML Kit GenAI on Pixel 9+, otherwise rejects)
-- **Capabilities probe** — `getDeviceCapabilities()`
+Most on-device AI demos show generation working on the one phone the author
+owns. The interesting case is the other 95% of phones — no AICore, no Apple
+Intelligence — so this app leads with availability: every feature's state, the
+reason when it is unavailable, and whether that reason is permanent. Then it
+summarises an article and reports which route produced the result and whether
+it was degraded.
 
-Source lives under [`src/App.tsx`](./src/App.tsx).
+It is also the first consumer of this package's own Expo config plugin, so if
+the plugin breaks, this app stops building. CI runs `expo prebuild` on every
+pull request for exactly that reason.
 
 ## Run it
 
-This package is a code reference, wired up to consume the parent library via `file:..`. To run on a device:
+Needs a development build — the native module cannot exist in Expo Go. (It will
+not crash there: importing the package is safe, and calls reject with
+`MODULE_NOT_LINKED`.)
 
 ```bash
 cd example
 npm install
-npx react-native start
-# in another shell
-npx react-native run-android   # or run-ios
+npm run ios        # or: npm run android
 ```
 
-iOS additionally needs a one-off pod install before first run:
+Those scripts run `expo run:*`, which prebuilds the native projects on first
+use. To regenerate them from scratch:
 
 ```bash
-cd ios && pod install
+npm run prebuild   # expo prebuild --clean
 ```
 
-The example is a standard React Native 0.80 / React 19 project. Native folders (`ios/`, `android/`) are not committed — generate them via `npx @react-native-community/cli init` if you want a runnable host, then drop `src/App.tsx` and the existing `index.js` / `app.json` over the generated entries.
+`ios/` and `android/` are deliberately not committed — the config plugin
+generates them, which keeps ~30k lines of scaffolding out of the repository and
+means the plugin is exercised rather than trusted.
+
+## What you should see
+
+On a device without a generative model, `summarize` falls back to the bundled
+extractive summariser on Android and rejects honestly on iOS. Either way the
+result carries its route and an `attempts` trace, so a fallback is never
+mistaken for a model.
+
+The library is consumed through `file:..`, so edits to `../src` show up here
+after `npm run build` in the repository root.
+
+---
+
+Part of [OpenSLM](https://openslm.ai) · built to the
+[Open Small Models Accord](https://openslm.ai/accord)

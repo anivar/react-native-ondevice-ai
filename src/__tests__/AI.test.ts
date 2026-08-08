@@ -1,77 +1,126 @@
-jest.mock('../specs/NativeAIToolkitSpec', () => ({
+/**
+ * The mock is typed `Spec`, so a change to the native interface fails this
+ * file rather than being discovered on a device. It had already drifted: the
+ * `features` map was missing five of the flags DeviceCapabilities declares.
+ *
+ * Rejections carry a `code` property, which is how React Native actually
+ * surfaces a native reject. The previous mock threw `new Error('...')` with the
+ * code in the message, so the assertions — all `rejects.toThrow()` with no
+ * argument — would have passed on a typo's TypeError just as happily.
+ */
+
+import type { FeatureAvailability, FeatureAvailabilityMap, Spec } from '../specs/NativeAIToolkit';
+
+const YES: FeatureAvailability = { state: 'available' };
+const NO_API: FeatureAvailability = {
+  state: 'unavailable',
+  reason: 'no-platform-api',
+  detail: 'No public iOS API.',
+};
+
+/**
+ * An eligible iOS 26 device whose Apple Intelligence model is still
+ * downloading — the case a boolean flag could not represent, and the reason
+ * `availability` exists.
+ */
+const availability: FeatureAvailabilityMap = {
+  analyzeText: YES,
+  analyzeImage: YES,
+  proofread: YES,
+  extractEntities: YES,
+  scanBarcodes: YES,
+  labelImage: YES,
+  segmentPerson: YES,
+  embedText: YES,
+  transcribe: YES,
+  summarize: { state: 'downloading', detail: 'Apple Intelligence model is downloading.' },
+  rewrite: { state: 'downloading' },
+  generate: { state: 'downloading' },
+  chat: { state: 'downloading' },
+  smartReplies: NO_API,
+  translate: NO_API,
+  describeImage: NO_API,
+};
+
+/** Builds the error shape React Native delivers from a native reject. */
+function nativeReject(code: string): Error & { code: string } {
+  return Object.assign(new Error(`native said ${code}`), { code });
+}
+
+const native: Spec = {
+  getDeviceCapabilities: jest.fn(async () => ({
+    platform: 'ios' as const,
+    osVersion: '18.0',
+    hasNeuralEngine: true,
+    hasAppleIntelligence: false,
+    hasGeminiNano: false,
+    hasMLKitGenAI: false,
+    hasOnDeviceSpeech: true,
+    supportedLanguages: ['en', 'es'],
+    availability,
+  })),
+  analyzeText: jest.fn(async () => ({
+    language: 'en',
+    sentiment: 0.5,
+    confidence: 0.9,
+  })),
+  extractEntities: jest.fn(async () => []),
+  identifyLanguage: jest.fn(async () => 'en'),
+  embedText: jest.fn(async () => [0.1, 0.2]),
+  analyzeImage: jest.fn(async () => ({ text: '', objects: [], faces: [] })),
+  scanBarcodes: jest.fn(async () => []),
+  labelImage: jest.fn(async () => []),
+  describeImage: jest.fn(async () => {
+    throw nativeReject('UNSUPPORTED_PLATFORM');
+  }),
+  segmentPerson: jest.fn(async () => ({ maskBase64: '', width: 1, height: 1 })),
+  proofreadText: jest.fn(async (text: string) => ({
+    correctedText: text,
+    corrections: [],
+  })),
+  summarizeText: jest.fn(async () => {
+    throw nativeReject('ON_DEVICE_UNSUPPORTED');
+  }),
+  rewriteText: jest.fn(async () => {
+    throw nativeReject('UNSUPPORTED_OS');
+  }),
+  generateText: jest.fn(async () => {
+    throw nativeReject('FEATURE_UNAVAILABLE');
+  }),
+  chat: jest.fn(async () => {
+    throw nativeReject('CHAT_FAILED');
+  }),
+  smartReplies: jest.fn(async () => []),
+  translateText: jest.fn(async () => {
+    throw nativeReject('UNSUPPORTED_PLATFORM');
+  }),
+  transcribeAudioFile: jest.fn(async () => ({
+    text: 'hello',
+    confidence: 0.9,
+    locale: 'en-US',
+  })),
+  enablePrivateMode: jest.fn(),
+  isPrivateModeEnabled: jest.fn(() => false),
+};
+
+jest.mock('../specs/NativeAIToolkit', () => ({
   __esModule: true,
-  default: {
-    getDeviceCapabilities: jest.fn(async () => ({
-      platform: 'ios',
-      osVersion: '18.0',
-      hasNeuralEngine: true,
-      hasAppleIntelligence: false,
-      hasGeminiNano: false,
-      hasMLKitGenAI: false,
-      hasOnDeviceSpeech: true,
-      supportedLanguages: ['en', 'es'],
-      features: {
-        analyzeText: true,
-        analyzeImage: true,
-        proofread: true,
-        summarize: false,
-        rewrite: false,
-        generate: false,
-        chat: false,
-        smartReplies: false,
-        extractEntities: true,
-        translate: false,
-        transcribe: true,
-      },
-    })),
-    analyzeText: jest.fn(async (_text: string) => ({
-      language: 'en',
-      sentiment: 0.5,
-      confidence: 0.9,
-    })),
-    extractEntities: jest.fn(async () => []),
-    identifyLanguage: jest.fn(async () => 'en'),
-    analyzeImage: jest.fn(async () => ({ text: '', objects: [], faces: [] })),
-    proofreadText: jest.fn(async (text: string) => ({
-      correctedText: text,
-      corrections: [],
-    })),
-    summarizeText: jest.fn(async () => {
-      throw new Error('UNSUPPORTED_PLATFORM');
-    }),
-    rewriteText: jest.fn(async () => {
-      throw new Error('UNSUPPORTED_PLATFORM');
-    }),
-    generateText: jest.fn(async () => {
-      throw new Error('FEATURE_UNAVAILABLE');
-    }),
-    chat: jest.fn(async () => {
-      throw new Error('FEATURE_UNAVAILABLE');
-    }),
-    smartReplies: jest.fn(async () => []),
-    translateText: jest.fn(async () => {
-      throw new Error('UNSUPPORTED_PLATFORM');
-    }),
-    transcribeAudioFile: jest.fn(async () => ({
-      text: 'hello',
-      confidence: 0.9,
-      locale: 'en-US',
-    })),
-    enablePrivateMode: jest.fn(),
-    isPrivateModeEnabled: jest.fn(() => false),
-  },
+  default: native,
 }));
 
 import {
   analyzeImage,
   analyzeText,
   chat,
+  ErrorCodes,
   enablePrivateMode,
+  explainCall,
   extractEntities,
   generateText,
   getDeviceCapabilities,
   identifyLanguage,
   isPrivateModeEnabled,
+  isTransient,
   proofreadText,
   rewriteText,
   smartReplies,
@@ -89,12 +138,41 @@ describe('mobile-ai-toolkit', () => {
     expect(typeof transcribeAudioFile).toBe('function');
   });
 
-  test('getDeviceCapabilities returns shape with features map', async () => {
+  test('availability separates "not yet" from "never here"', async () => {
+    const caps = await getDeviceCapabilities();
+
+    // The whole point: both of these read `true` in the deprecated boolean map,
+    // and they are not the same answer.
+    expect(caps.availability.summarize.state).toBe('downloading');
+    expect(caps.availability.translate.state).toBe('unavailable');
+    expect(caps.availability.translate.reason).toBe('no-platform-api');
+  });
+
+  test('explainCall answers without running inference', async () => {
+    const plan = await explainCall('summarize');
+    expect(plan.willSucceed).toBe(false);
+    expect(plan.mayChangeLater).toBe(true);
+    expect(plan.summary).toMatch(/downloading/i);
+
+    const dead = await explainCall('translate');
+    expect(dead.willSucceed).toBe(false);
+    // no-platform-api is permanent, so a UI should hide this one for good.
+    expect(dead.mayChangeLater).toBe(false);
+
+    const works = await explainCall('analyzeText');
+    expect(works.willSucceed).toBe(true);
+  });
+
+  test('explainCall with no argument covers every feature', async () => {
+    const all = await explainCall();
+    expect(all).toHaveLength(16);
+    expect(all.every((p) => typeof p.summary === 'string')).toBe(true);
+  });
+
+  test('getDeviceCapabilities returns the availability map', async () => {
     const caps = await getDeviceCapabilities();
     expect(caps.platform).toBeDefined();
-    expect(caps.features).toBeDefined();
-    expect(typeof caps.features.analyzeText).toBe('boolean');
-    expect(typeof caps.features.summarize).toBe('boolean');
+    expect(caps.availability.analyzeText.state).toBe('available');
     expect(Array.isArray(caps.supportedLanguages)).toBe(true);
   });
 
@@ -123,25 +201,44 @@ describe('mobile-ai-toolkit', () => {
     expect(Array.isArray(result.corrections)).toBe(true);
   });
 
-  test('summarize/rewrite/translate reject UNSUPPORTED_PLATFORM on iOS mock', async () => {
-    await expect(summarizeText('long text', 'bullets')).rejects.toThrow();
-    await expect(rewriteText('hello', 'professional')).rejects.toThrow();
-    await expect(translateText('hello', 'en', 'es')).rejects.toThrow();
+  test('a platform without the API rejects FEATURE_UNAVAILABLE, not a bare Error', async () => {
+    // Three different native codes, one public code: that is the point of the
+    // taxonomy. The native string stays available for a bug report.
+    for (const [call, platformCode] of [
+      [() => summarizeText('long text'), 'ON_DEVICE_UNSUPPORTED'],
+      [() => rewriteText('hello', 'professional'), 'UNSUPPORTED_OS'],
+      [() => translateText('hello', 'en', 'es'), 'UNSUPPORTED_PLATFORM'],
+      [() => generateText('hi', { maxOutputTokens: 10 }), 'FEATURE_UNAVAILABLE'],
+    ] as const) {
+      await expect(call()).rejects.toMatchObject({
+        name: 'AIError',
+        code: ErrorCodes.FEATURE_UNAVAILABLE,
+        platformCode,
+      });
+    }
   });
 
-  test('generateText / chat exist and reject when unavailable on the mock device', async () => {
-    expect(typeof generateText).toBe('function');
-    expect(typeof chat).toBe('function');
-    await expect(generateText('hi', { maxOutputTokens: 10 })).rejects.toThrow();
+  test('a failure that ran and broke is not reported as unavailable', async () => {
     await expect(
       chat([{ role: 'user', content: 'hi' }], { maxOutputTokens: 10 })
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      code: ErrorCodes.INFERENCE_FAILED,
+      platformCode: 'CHAT_FAILED',
+    });
+  });
+
+  test('unavailable is permanent, so nothing here is worth retrying', async () => {
+    const err = await summarizeText('x').catch((e) => e);
+    expect(isTransient(err)).toBe(false);
+  });
+
+  test('the feature name survives into the error', async () => {
+    const err = await translateText('hello', 'en', 'es').catch((e) => e);
+    expect(err.feature).toBe('translateText');
   });
 
   test('smartReplies returns array', async () => {
-    const replies = await smartReplies([
-      { text: 'how are you?', fromUser: false, timestampMs: Date.now() },
-    ]);
+    const replies = await smartReplies([{ text: 'how are you?', fromUser: false, timestampMs: 0 }]);
     expect(Array.isArray(replies)).toBe(true);
   });
 
