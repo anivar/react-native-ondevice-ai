@@ -127,6 +127,22 @@ argument returns the plan for all 16 features. It runs no inference and touches
 no network. Since the two platforms deliberately differ, it is the only way to
 see the other platform's answer without owning the hardware.
 
+### Bare React Native
+
+This package targets iOS 17, above React Native's own floor of 15.1, so raise
+the deployment target in `ios/Podfile` before `pod install`:
+
+```ruby
+platform :ios, '17.0'
+```
+
+Without it CocoaPods refuses to resolve, with "they required a higher minimum
+deployment target". On Android, set `minSdkVersion = 26` in
+`android/build.gradle` — ML Kit GenAI's own minimum, below which the manifest
+merge fails.
+
+Expo projects get both automatically; see below.
+
 ### Expo
 
 Expo SDK 55+ requires the New Architecture, which is what this package targets,

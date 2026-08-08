@@ -118,6 +118,17 @@ jobs:
           npm install
           npm install ../mobile-ai-toolkit
 
+      # A consuming app must raise its deployment target to match this pod.
+      # React Native 0.86's template ships 15.1, and CocoaPods refuses to
+      # resolve a pod that needs more, so this is the exact step a bare RN
+      # developer performs by hand and the Expo config plugin performs for them.
+      # Doing it here keeps CI honest about the setup the README documents.
+      - name: Raise the host app's iOS deployment target
+        working-directory: HostApp/ios
+        run: |
+          sed -i '' "s/platform :ios, min_ios_version_supported/platform :ios, '17.0'/" Podfile
+          grep -n "platform :ios" Podfile
+
       - name: Pod install
         working-directory: HostApp/ios
         run: RCT_NEW_ARCH_ENABLED=1 pod install
