@@ -36,6 +36,16 @@ jobs:
       - name: No network in native sources
         run: node scripts/check-no-network.mjs
 
+      # Runs on Linux because codegen is JavaScript. Eighteen of twenty methods
+      # once carried a selector the JSI layer never calls, and the compiler
+      # reported it as a warning on a platform CI did not build.
+      - name: iOS selectors match the generated TurboModule protocol
+        run: |
+          node node_modules/react-native/scripts/generate-codegen-artifacts.js \
+            --path . --outputPath /tmp/codegen --targetPlatform ios
+          node scripts/check-ios-conformance.mjs \
+            /tmp/codegen/build/generated/ios/ReactCodegen/AIToolkitTurboModuleSpec/AIToolkitTurboModuleSpec.h
+
       - name: No unjustified Android permissions
         run: node scripts/check-permissions.mjs
 

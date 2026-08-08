@@ -31,7 +31,7 @@ RCT_EXPORT_MODULE()
 #pragma mark - Device Capabilities
 
 RCT_EXPORT_METHOD(getDeviceCapabilities:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NSMutableDictionary *capabilities = [NSMutableDictionary dictionary];
     capabilities[@"platform"] = @"ios";
@@ -141,8 +141,8 @@ static NSString *entityTypeFromTag(NLTag tag) {
 
 RCT_EXPORT_METHOD(analyzeText:(NSString *)text
                  options:(NSDictionary *)options
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     if (text.length == 0) {
         reject(@"INVALID_INPUT", @"Text cannot be empty", nil);
@@ -201,16 +201,16 @@ RCT_EXPORT_METHOD(analyzeText:(NSString *)text
 }
 
 RCT_EXPORT_METHOD(extractEntities:(NSString *)text
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     resolve([self extractEntitiesSync:text]);
     
 }
 
 RCT_EXPORT_METHOD(identifyLanguage:(NSString *)text
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NLLanguageRecognizer *recognizer = [[NLLanguageRecognizer alloc] init];
     [recognizer processString:text];
@@ -221,8 +221,8 @@ RCT_EXPORT_METHOD(identifyLanguage:(NSString *)text
 
 RCT_EXPORT_METHOD(analyzeImage:(NSString *)imageBase64
                  options:(NSDictionary *)options
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NSData *imageData = [[NSData alloc] initWithBase64EncodedString:imageBase64
                                                             options:NSDataBase64DecodingIgnoreUnknownCharacters];
@@ -311,8 +311,8 @@ RCT_EXPORT_METHOD(analyzeImage:(NSString *)imageBase64
 #pragma mark - Proofread
 
 RCT_EXPORT_METHOD(proofreadText:(NSString *)text
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     UITextChecker *checker = [[UITextChecker alloc] init];
     NSMutableArray *corrections = [NSMutableArray array];
@@ -361,14 +361,6 @@ RCT_EXPORT_METHOD(proofreadText:(NSString *)text
 // the Foundation Models bridge (AIToolkitFoundationModels.swift). Otherwise
 // they reject FEATURE_UNAVAILABLE / UNSUPPORTED_PLATFORM with a precise reason.
 
-static BOOL AI_FoundationModelsAvailable(void) {
-#if AI_HAS_FOUNDATION_BRIDGE
-    if (@available(iOS 26.0, *)) {
-        return [AIToolkitFoundationModels isAvailable];
-    }
-#endif
-    return NO;
-}
 
 static NSString *AI_FoundationModelsUnavailableReason(void) {
 #if AI_HAS_FOUNDATION_BRIDGE
@@ -381,8 +373,8 @@ static NSString *AI_FoundationModelsUnavailableReason(void) {
 
 RCT_EXPORT_METHOD(summarizeText:(NSString *)text
                  format:(NSString *)format
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     if (text.length == 0) {
         reject(@"INVALID_INPUT", @"Text cannot be empty", nil);
@@ -404,8 +396,8 @@ RCT_EXPORT_METHOD(summarizeText:(NSString *)text
 
 RCT_EXPORT_METHOD(rewriteText:(NSString *)text
                  style:(NSString *)style
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     if (text.length == 0) {
         reject(@"INVALID_INPUT", @"Text cannot be empty", nil);
@@ -426,8 +418,8 @@ RCT_EXPORT_METHOD(rewriteText:(NSString *)text
 }
 
 RCT_EXPORT_METHOD(smartReplies:(NSArray *)messages
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     reject(@"UNSUPPORTED_PLATFORM",
            @"Smart Reply is not available on iOS (Android-only via ML Kit).",
@@ -437,8 +429,8 @@ RCT_EXPORT_METHOD(smartReplies:(NSArray *)messages
 RCT_EXPORT_METHOD(translateText:(NSString *)text
                  sourceLang:(NSString *)sourceLang
                  targetLang:(NSString *)targetLang
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     reject(@"UNSUPPORTED_PLATFORM",
            @"iOS Translation framework requires SwiftUI host integration; tracked for v2.2. On Android use ML Kit Translator.",
@@ -447,8 +439,8 @@ RCT_EXPORT_METHOD(translateText:(NSString *)text
 
 RCT_EXPORT_METHOD(generateText:(NSString *)prompt
                  options:(NSDictionary *)options
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     if (prompt.length == 0) {
         reject(@"INVALID_INPUT", @"Prompt cannot be empty", nil);
@@ -473,8 +465,8 @@ RCT_EXPORT_METHOD(generateText:(NSString *)prompt
 
 RCT_EXPORT_METHOD(chat:(NSArray *)messages
                  options:(NSDictionary *)options
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     if (messages.count == 0) {
         reject(@"INVALID_INPUT", @"chat() requires at least one message.", nil);
@@ -498,8 +490,8 @@ RCT_EXPORT_METHOD(chat:(NSArray *)messages
 }
 
 RCT_EXPORT_METHOD(describeImage:(NSString *)imageBase64
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     reject(@"UNSUPPORTED_PLATFORM",
            @"Apple Intelligence's on-device foundation model is text-only; no public iOS image-description API. Use labelImage() / scanBarcodes() / analyzeImage() for visual data.",
@@ -509,8 +501,8 @@ RCT_EXPORT_METHOD(describeImage:(NSString *)imageBase64
 #pragma mark - Embeddings
 
 RCT_EXPORT_METHOD(embedText:(NSString *)text
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NLLanguageRecognizer *rec = [[NLLanguageRecognizer alloc] init];
     [rec processString:text];
@@ -600,8 +592,8 @@ RCT_EXPORT_METHOD(embedText:(NSString *)text
 #pragma mark - Vision (extras)
 
 RCT_EXPORT_METHOD(scanBarcodes:(NSString *)imageBase64
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
                                                        options:NSDataBase64DecodingIgnoreUnknownCharacters];
@@ -638,8 +630,8 @@ RCT_EXPORT_METHOD(scanBarcodes:(NSString *)imageBase64
 }
 
 RCT_EXPORT_METHOD(labelImage:(NSString *)imageBase64
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
                                                        options:NSDataBase64DecodingIgnoreUnknownCharacters];
@@ -670,8 +662,8 @@ RCT_EXPORT_METHOD(labelImage:(NSString *)imageBase64
 }
 
 RCT_EXPORT_METHOD(segmentPerson:(NSString *)imageBase64
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     NSData *data = [[NSData alloc] initWithBase64EncodedString:imageBase64
                                                        options:NSDataBase64DecodingIgnoreUnknownCharacters];
@@ -718,8 +710,8 @@ RCT_EXPORT_METHOD(segmentPerson:(NSString *)imageBase64
 
 RCT_EXPORT_METHOD(transcribeAudioFile:(NSString *)filePath
                  options:(NSDictionary *)options
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+                 resolve:(RCTPromiseResolveBlock)resolve
+                 reject:(RCTPromiseRejectBlock)reject)
 {
     // Speech recognition needs the user's permission before anything else works.
     // Without this call SFSpeechRecognizer.isAvailable is NO, so every request
@@ -760,8 +752,8 @@ RCT_EXPORT_METHOD(transcribeAudioFile:(NSString *)filePath
 
 - (void)transcribeAuthorized:(NSString *)filePath
                      options:(NSDictionary *)options
-                    resolver:(RCTPromiseResolveBlock)resolve
-                    rejecter:(RCTPromiseRejectBlock)reject
+                    resolve:(RCTPromiseResolveBlock)resolve
+                    reject:(RCTPromiseRejectBlock)reject
 {
     NSString *localeId = options[@"locale"] ?: @"en-US";
     NSLocale *locale = [NSLocale localeWithLocaleIdentifier:localeId];
