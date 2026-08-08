@@ -9,11 +9,7 @@
  * argument — would have passed on a typo's TypeError just as happily.
  */
 
-import type {
-  FeatureAvailability,
-  FeatureAvailabilityMap,
-  Spec,
-} from '../specs/NativeAIToolkit';
+import type { FeatureAvailability, FeatureAvailabilityMap, Spec } from '../specs/NativeAIToolkit';
 
 const YES: FeatureAvailability = { state: 'available' };
 const NO_API: FeatureAvailability = {

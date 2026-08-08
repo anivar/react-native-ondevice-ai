@@ -774,8 +774,14 @@ RCT_EXPORT_METHOD(transcribeAudioFile:(NSString *)filePath
         reject(@"RECOGNIZER_UNAVAILABLE", @"Speech recognizer is not currently available", nil);
         return;
     }
-    if (![SFSpeechRecognizer supportsOnDeviceRecognition]) {
-        reject(@"ON_DEVICE_UNSUPPORTED", @"On-device recognition not supported on this device", nil);
+    // Instance property, and per-locale: this recognizer, for this language.
+    if (!recognizer.supportsOnDeviceRecognition) {
+        reject(@"ON_DEVICE_UNSUPPORTED",
+               [NSString stringWithFormat:
+                @"On-device recognition is not available for %@ on this device. "
+                @"Another locale may work; this package never falls back to Apple's servers.",
+                localeId],
+               nil);
         return;
     }
 
