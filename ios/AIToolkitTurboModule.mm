@@ -11,7 +11,15 @@
 #import "AIToolkitTurboModuleSpec.h"
 #endif
 
-#if __has_include("MobileAIToolkit-Swift.h")
+// CocoaPods generates this header from the pod's module name, which is s.name
+// with every non-alphanumeric character replaced by an underscore. Renaming the
+// pod renames the header, so both spellings are tried: the current one first,
+// and the pre-rename one so a stale Pods directory still resolves rather than
+// silently compiling without the Foundation Models bridge.
+#if __has_include("react_native_ondevice_ai-Swift.h")
+#import "react_native_ondevice_ai-Swift.h"
+#define AI_HAS_FOUNDATION_BRIDGE 1
+#elif __has_include("MobileAIToolkit-Swift.h")
 #import "MobileAIToolkit-Swift.h"
 #define AI_HAS_FOUNDATION_BRIDGE 1
 #endif

@@ -22,7 +22,7 @@
     "app.plugin.js",
     "README.md",
     "LICENSE",
-    "MobileAIToolkit.podspec"
+    "react-native-ondevice-ai.podspec"
   ],
   "scripts": {
     "build": "tsc",

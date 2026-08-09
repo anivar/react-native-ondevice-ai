@@ -20,9 +20,10 @@ import com.google.mlkit.genai.imagedescription.ImageDescriber
 import com.google.mlkit.genai.imagedescription.ImageDescriberOptions
 import com.google.mlkit.genai.imagedescription.ImageDescription
 import com.google.mlkit.genai.imagedescription.ImageDescriptionRequest
+import com.google.mlkit.genai.prompt.GenerateContentRequest
+import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.GenerativeModel
-import com.google.mlkit.genai.prompt.PromptApi
-import com.google.mlkit.genai.prompt.PromptRequest
+import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.proofreading.Proofreader
 import com.google.mlkit.genai.proofreading.ProofreaderOptions
 import com.google.mlkit.genai.proofreading.Proofreading
@@ -60,10 +61,23 @@ import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 @ReactModule(name = AIToolkitTurboModule.NAME)
 class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
     NativeAIToolkitSpec(reactContext) {
+
+    /**
+     * The Prompt API is the one GenAI feature exposed as suspend functions
+     * rather than Tasks, so it needs a scope. SupervisorJob keeps one failed
+     * generation from cancelling the next; the scope is cancelled in
+     * invalidate() so work does not outlive the module.
+     */
+    private val genAiScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
         const val NAME = "AIToolkitTurboModule"
@@ -787,45 +801,51 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
 
     // ---- Generative: prompt ----
 
+    // The Prompt API is coroutine-based, unlike the other four GenAI features,
+    // which are Task-based. It has no PromptApi entry point and no
+    // PromptRequest: the client comes from Generation.getClient(), status and
+    // inference are suspend functions, and the reply arrives as a list of
+    // candidates rather than a single .text.
     override fun generateText(prompt: String, options: ReadableMap, promise: Promise) {
-        try {
-            val maxTokens = if (options.hasKey("maxOutputTokens")) options.getInt("maxOutputTokens") else 512
-            val temperature = if (options.hasKey("temperature")) options.getDouble("temperature").toFloat() else 0.7f
+        val maxTokens = if (options.hasKey("maxOutputTokens")) options.getInt("maxOutputTokens") else 512
+        val temperature =
+            if (options.hasKey("temperature")) options.getDouble("temperature").toFloat() else 0.7f
 
-            val model: GenerativeModel = PromptApi.getClient(reactContext)
-            model.checkFeatureStatus()
-                .addOnSuccessListener {
-                    model.prepareInferenceEngine()
-                        .addOnSuccessListener {
-                            val request = PromptRequest.builder(prompt)
-                                .setMaxOutputTokens(maxTokens)
-                                .setTemperature(temperature)
-                                .build()
-                            model.runInference(request)
-                                .addOnSuccessListener { res ->
-                                    promise.resolve(res.text ?: "")
-                                    model.close()
-                                }
-                                .addOnFailureListener {
-                                    promise.reject("GENERATE_INFERENCE_ERROR", it.message, it)
-                                    model.close()
-                                }
-                        }
-                        .addOnFailureListener {
-                            promise.reject("GENERATE_PREPARE_ERROR", it.message, it)
-                            model.close()
-                        }
-                }
-                .addOnFailureListener {
+        genAiScope.launch {
+            var model: GenerativeModel? = null
+            try {
+                model = Generation.getClient()
+
+                val status = model.checkStatus()
+                if (status != FeatureStatus.AVAILABLE) {
                     promise.reject(
                         "FEATURE_UNAVAILABLE",
-                        "ML Kit GenAI Prompt API is not available on this device. ${it.message}",
-                        it
+                        "The ML Kit GenAI Prompt API reports status $status on this device."
                     )
-                    model.close()
+                    return@launch
                 }
-        } catch (e: Throwable) {
-            promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI Prompt API is not installed in this build", e)
+
+                val request = GenerateContentRequest.Builder(TextPart(prompt)).apply {
+                    maxOutputTokens = maxTokens
+                    this.temperature = temperature
+                }.build()
+
+                val response = model.generateContent(request)
+                val text = response.candidates.firstOrNull()?.text
+                if (text == null) {
+                    promise.reject("GENERATE_INFERENCE_ERROR", "The model returned no candidates.")
+                } else {
+                    promise.resolve(text)
+                }
+            } catch (e: Throwable) {
+                promise.reject("GENERATE_INFERENCE_ERROR", e.message, e)
+            } finally {
+                try {
+                    model?.close()
+                } catch (_: Throwable) {
+                    // close() is best-effort; a failure here must not mask the result above
+                }
+            }
         }
     }
 
@@ -1049,6 +1069,11 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
      * Rejects when a model download is about to happen and private mode forbids
      * it. Returns true if the caller should stop.
      */
+    override fun invalidate() {
+        genAiScope.cancel()
+        super.invalidate()
+    }
+
     private fun blockedByPrivateMode(promise: Promise, what: String): Boolean {
         if (!privateMode) return false
         promise.reject(

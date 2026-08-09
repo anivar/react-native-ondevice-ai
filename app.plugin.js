@@ -50,15 +50,6 @@ const MIN_SDK_VERSION = 26;
 /** Where NLContextualEmbedding — all of embedText — becomes available. */
 const IOS_DEPLOYMENT_TARGET = '17.0';
 
-/**
- * The ML Kit GenAI artifacts are compiled with Kotlin 2.3, and Kotlin refuses
- * to read metadata newer than the compiler: React Native 0.86's default of
- * 2.1.20 fails with "Module was compiled with an incompatible version of
- * Kotlin" on every one of them. Raising the app's Kotlin is the only fix that
- * is not "wait for ML Kit to publish a 2.1 build".
- */
-const MIN_KOTLIN_VERSION = '2.3.21';
-
 const DEFAULT_SPEECH_PERMISSION =
   'Allow $(PRODUCT_NAME) to transcribe audio on this device. Nothing is sent to a server.';
 
@@ -79,44 +70,11 @@ function raiseGradleProperty(properties, key, minimum) {
   return properties;
 }
 
-/**
- * The same, for a dotted version string. Compares numerically per segment, so
- * 2.10.0 beats 2.9.0 — which a string comparison gets backwards.
- */
-function raiseVersionProperty(properties, key, minimum) {
-  const parse = (v) =>
-    String(v)
-      .split('.')
-      .map((n) => Number.parseInt(n, 10) || 0);
-  const isLower = (a, b) => {
-    const [x, y] = [parse(a), parse(b)];
-    for (let i = 0; i < Math.max(x.length, y.length); i++) {
-      if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0);
-    }
-    return false;
-  };
-
-  const existing = properties.find((p) => p.type === 'property' && p.key === key);
-  if (!existing) {
-    properties.push({ type: 'property', key, value: minimum });
-    return properties;
-  }
-  if (isLower(existing.value, minimum)) {
-    existing.value = minimum;
-  }
-  return properties;
-}
-
 const withOnDeviceAI = (config, options = {}) => {
   const speechPermission = options.speechRecognitionPermission ?? DEFAULT_SPEECH_PERMISSION;
 
   config = withGradleProperties(config, (cfg) => {
     cfg.modResults = raiseGradleProperty(cfg.modResults, 'android.minSdkVersion', MIN_SDK_VERSION);
-    cfg.modResults = raiseVersionProperty(
-      cfg.modResults,
-      'android.kotlinVersion',
-      MIN_KOTLIN_VERSION
-    );
     return cfg;
   });
 

@@ -39,6 +39,11 @@ jobs:
       - name: No unjustified Android permissions
         run: node scripts/check-permissions.mjs
 
+      # Catches on Linux in a second what otherwise surfaces minutes into the
+      # macOS job — or not until a user runs pod install.
+      - name: Podspec agrees with the manifest
+        run: node scripts/check-podspec.mjs
+
       - name: Build
         run: npm run build
 
@@ -142,16 +147,11 @@ jobs:
       # manifest merger refuses to build the app without it. This is the exact
       # step docs/setup.md asks a bare React Native developer to perform, and
       # the one the Expo config plugin performs for them.
-      # Kotlin too: the ML Kit GenAI artifacts are built with Kotlin 2.3, and a
-      # 2.1 compiler refuses their metadata outright — "Module was compiled with
-      # an incompatible version of Kotlin", once per artifact. Both values are
-      # what the Expo config plugin writes for Expo apps.
-      - name: Raise the host app's minSdkVersion and Kotlin
+      - name: Raise the host app's minSdkVersion
         working-directory: HostApp/android
         run: |
           sed -i "s/minSdkVersion = 24/minSdkVersion = 26/" build.gradle
-          sed -i "s/kotlinVersion = \".*\"/kotlinVersion = \"2.3.21\"/" build.gradle
-          grep -nE "minSdkVersion|kotlinVersion" build.gradle
+          grep -n "minSdkVersion" build.gradle
 
       # pipefail is not optional: without it the step exits with tee's status,
       # so a FAILED compile reports success.
