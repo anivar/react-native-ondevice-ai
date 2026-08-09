@@ -1,6 +1,6 @@
 {
   "name": "react-native-ondevice-ai",
-  "version": "2.2.1",
+  "version": "0.1.0",
   "description": "On-device AI for React Native: text, vision, speech and generative models via Apple Vision/NaturalLanguage/Speech/Foundation Models and Google ML Kit. Nothing leaves the device.",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

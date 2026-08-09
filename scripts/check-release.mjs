@@ -35,8 +35,8 @@ if (!isPrerelease && distTag !== 'latest') {
 }
 
 if (pkg.files?.length) {
-  // `files` entries that do not exist ship nothing and mislead readers of the
-  // manifest; SETUP.md sat here through five releases without existing.
+  // A `files` entry that does not exist ships nothing and misleads every reader
+  // of the manifest.
   const { existsSync } = await import('node:fs');
   const { join } = await import('node:path');
   const root = new URL('..', import.meta.url).pathname;

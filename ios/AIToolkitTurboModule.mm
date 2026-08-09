@@ -11,16 +11,12 @@
 #import "AIToolkitTurboModuleSpec.h"
 #endif
 
-// CocoaPods generates this header from the pod's module name, which is s.name
-// with every non-alphanumeric character replaced by an underscore. Renaming the
-// pod renames the header, so both spellings are tried: the current one first,
-// and the pre-rename one so a stale Pods directory still resolves rather than
-// silently compiling without the Foundation Models bridge.
+// CocoaPods generates this header from the pod's module name: s.name with each
+// non-alphanumeric character replaced by an underscore. If it ever stops
+// matching, __has_include simply fails and the Foundation Models bridge
+// compiles out silently — which is what check-podspec.mjs guards against.
 #if __has_include("react_native_ondevice_ai-Swift.h")
 #import "react_native_ondevice_ai-Swift.h"
-#define AI_HAS_FOUNDATION_BRIDGE 1
-#elif __has_include("MobileAIToolkit-Swift.h")
-#import "MobileAIToolkit-Swift.h"
 #define AI_HAS_FOUNDATION_BRIDGE 1
 #endif
 
@@ -50,12 +46,11 @@ RCT_EXPORT_METHOD(getDeviceCapabilities:(RCTPromiseResolveBlock)resolve
 
     // Generative availability, straight from SystemLanguageModel.availability.
     //
-    // The WTWritingToolsCoordinator fallback that used to sit here is gone. It
-    // asked whether the WritingTools class exists, which is true on every iOS
-    // 18.1 device regardless of whether that device is Apple-Intelligence
-    // eligible or has the feature switched on. hasAppleIntelligence — and with
-    // it four generative feature flags — therefore read YES on hardware where
-    // every generative call rejects.
+    // Nothing else will do. Probing for the WritingTools class, for instance,
+    // answers YES on every iOS 18.1 device regardless of whether that device is
+    // Apple-Intelligence eligible or has the feature switched on, so
+    // hasAppleIntelligence would read YES on hardware where every generative
+    // call rejects.
     NSString *genState = @"unavailable";
     NSString *genReason = @"os-too-old";
     NSString *genDetail = @"Foundation Models requires iOS 26 or later.";

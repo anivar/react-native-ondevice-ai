@@ -1,18 +1,17 @@
 #!/usr/bin/env node
 /**
- * The podspec has to agree with three other things, and when it does not, the
- * failure surfaces minutes into a macOS job — or not until a user runs
+ * The podspec has to agree with three other things, and each disagreement fails
+ * somewhere expensive: minutes into a macOS job, or not until a user runs
  * `pod install`.
  *
- * Renaming the package broke all three at once: the file became
- * react-native-ondevice-ai.podspec while `s.name` still read "MobileAIToolkit",
- * so autolinking looked for a pod that did not exist ("No podspec found for
- * MobileAIToolkit"); `files` still listed the old filename, so the published
- * tarball would have contained no podspec at all and iOS autolinking would have
- * found nothing to link; and the ObjC++ imported a Swift interop header named
- * after the old module.
+ *   1. `s.name` must equal the filename — CocoaPods resolves the pod by file,
+ *      so a mismatch is "No podspec found for <name>".
+ *   2. `files` must list it, or the published tarball ships without a podspec
+ *      and iOS autolinking finds nothing to link.
+ *   3. An ObjC source must include the Swift interop header, whose name is
+ *      derived from the module name, or the Swift half compiles out silently.
  *
- * All four checks are string comparisons. None needs a Mac.
+ * All of it is string comparison. None of it needs a Mac.
  */
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';

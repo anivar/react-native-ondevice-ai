@@ -16,12 +16,6 @@
   actually compiled rather than silently skipped.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) explains what each gate exists to catch.
 
-## Names this package has had
-
-It was published briefly as `@anivar/mobile-ai-toolkit`, then as
-`mobile-ai-toolkit`. Both are gone; `react-native-ondevice-ai` is the only
-name, and the repository redirects from the old ones.
-
 ## Citing this
 
 Releases are archived with a DOI. `CITATION.cff` carries the metadata GitHub's

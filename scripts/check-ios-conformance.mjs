@@ -3,11 +3,10 @@
  * Fails if the ObjC++ implementation does not export exactly the selectors the
  * generated TurboModule protocol declares.
  *
- * This is not pedantry. Eighteen of the twenty methods used `resolver:` and
- * `rejecter:` where codegen declares `resolve:` and `reject:`, so every
- * promise-returning method on iOS had a selector the JSI layer does not call.
- * The compiler said only "does not conform to protocol", a warning, and shipped
- * five releases that way.
+ * This is not pedantry. A method spelled `resolver:`/`rejecter:` where codegen
+ * declares `resolve:`/`reject:` is a method the JSI layer never calls, and
+ * clang reports it as "does not conform to protocol" — a warning, which builds
+ * happily ignore.
  *
  * Selector equality is the property that matters — ObjC dispatch is by selector
  * — so that is what this checks, ignoring parameter types. Codegen must have run

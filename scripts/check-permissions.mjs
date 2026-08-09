@@ -6,7 +6,7 @@
  * A library's manifest merges into every app that installs it, and the result
  * appears in that app's Play listing. A permission added here is a permission
  * every consuming app is seen to request, whether or not it uses the feature.
- * CAMERA and RECORD_AUDIO sat in this manifest for five releases without a
+ * CAMERA and RECORD_AUDIO have no business in this manifest without a
  * single call site needing them.
  *
  * Same shape and same reason as check-no-network.mjs: a claim about what this
