@@ -1113,10 +1113,10 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
             promise.reject("INVALID_INPUT", "chat() requires at least one message.")
             return
         }
-        // Flatten chat messages into a single tagged prompt — ML Kit GenAI's
-        // PromptApi is single-shot, so multi-turn history is replayed as text.
+        // The Prompt API is single-shot, so multi-turn history is replayed as
+        // one tagged prompt.
         val instructions = StringBuilder()
-        val turns = StringBuilder()
+        val turns = mutableListOf<String>()
         for (i in 0 until messages.size()) {
             val m = messages.getMap(i) ?: continue
             val role = m.getString("role") ?: continue
@@ -1125,25 +1125,87 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                 if (instructions.isNotEmpty()) instructions.append('\n')
                 instructions.append(content)
             } else {
-                turns.append(role.replaceFirstChar { it.uppercaseChar() })
-                turns.append(": ")
-                turns.append(content)
-                turns.append('\n')
+                turns.add("${role.replaceFirstChar { it.uppercaseChar() }}: $content")
             }
         }
         if (turns.isEmpty()) {
             promise.reject("INVALID_INPUT", "chat() requires at least one non-system message.")
             return
         }
-        val prompt = buildString {
-            if (instructions.isNotEmpty()) {
-                append(instructions)
-                append("\n\n")
+
+        genAiScope.launch {
+            // Every turn ever sent used to be concatenated with no bound, so a
+            // long conversation eventually exceeded the model's context and
+            // failed — later, mysteriously, and with the whole history to
+            // blame. The Prompt API can say what the ceiling is and what a
+            // prompt costs, so ask, and drop the oldest turns until it fits.
+            val kept = try {
+                fitToContext(instructions.toString(), turns)
+            } catch (_: Throwable) {
+                // If the model cannot be asked, send everything and let
+                // REQUEST_TOO_LARGE surface as the typed rejection it now is.
+                turns
             }
-            append(turns)
-            append("Assistant:")
+
+            if (kept.isEmpty()) {
+                promise.reject(
+                    "GENAI_REQUEST_TOO_LARGE",
+                    "The most recent message alone exceeds this model's context window."
+                )
+                return@launch
+            }
+
+            val prompt = buildString {
+                if (instructions.isNotEmpty()) {
+                    append(instructions)
+                    append("\n\n")
+                }
+                kept.forEach {
+                    append(it)
+                    append('\n')
+                }
+                append("Assistant:")
+            }
+            generateText(prompt, options, promise)
         }
-        generateText(prompt, options, promise)
+    }
+
+    /**
+     * Drops the oldest turns until the prompt fits the model's context window,
+     * keeping the system instructions and the most recent turns — the parts a
+     * caller would keep by hand.
+     *
+     * Returns an empty list when even the newest turn does not fit, which is a
+     * caller error rather than something to silently truncate.
+     */
+    private suspend fun fitToContext(instructions: String, turns: List<String>): List<String> {
+        val model = Generation.getClient()
+        try {
+            val limit = model.getTokenLimit()
+
+            var kept = turns
+            while (kept.isNotEmpty()) {
+                val candidate = buildString {
+                    if (instructions.isNotEmpty()) {
+                        append(instructions)
+                        append("\n\n")
+                    }
+                    kept.forEach {
+                        append(it)
+                        append('\n')
+                    }
+                    append("Assistant:")
+                }
+
+                val request = GenerateContentRequest.Builder(TextPart(candidate)).build()
+                if (model.countTokens(request).totalTokens <= limit) return kept
+
+                kept = kept.drop(1)
+            }
+            return emptyList()
+        } finally {
+            closeQuietly { model.close() }
+        }
     }
 
     // ---- Vision (extras) ----
