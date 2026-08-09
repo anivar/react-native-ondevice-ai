@@ -56,11 +56,12 @@ import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
-import com.google.mlkit.vision.segmentation.selfie.SelfieSegmentation
+import com.google.mlkit.vision.segmentation.Segmentation
 import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.ByteArrayOutputStream
+import androidx.concurrent.futures.await
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -235,8 +236,9 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                     .setLanguage(SummarizerOptions.Language.ENGLISH)
                     .build()
             )
-            summarizer.checkFeatureStatus()
-                .addOnSuccessListener { status ->
+            genAiScope.launch {
+                try {
+                    val status = summarizer.checkFeatureStatus().await()
                     finish(
                         when (status) {
                             FeatureStatus.AVAILABLE -> available()
@@ -255,8 +257,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                             )
                         }
                     )
-                }
-                .addOnFailureListener { e ->
+                } catch (e: Throwable) {
                     finish(
                         unavailable(
                             "hardware-ineligible",
@@ -264,6 +265,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                         )
                     )
                 }
+            }
         } catch (e: Throwable) {
             finish(unavailable("unknown", "GenAI probe failed: ${e.message}"))
         }
@@ -526,31 +528,21 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                 .setLanguage(SummarizerOptions.Language.ENGLISH)
                 .build()
             val summarizer: Summarizer = Summarization.getClient(opts)
-            summarizer.checkFeatureStatus()
-                .addOnSuccessListener { status ->
-                    summarizer.prepareInferenceEngine()
-                        .addOnSuccessListener {
-                            val request = SummarizationRequest.builder(text).build()
-                            val sb = StringBuilder()
-                            summarizer.runInference(request) { token ->
-                                sb.append(token)
-                            }.addOnSuccessListener {
-                                promise.resolve(sb.toString().ifEmpty { "" })
-                                summarizer.close()
-                            }.addOnFailureListener {
-                                promise.reject("SUMMARIZE_INFERENCE_ERROR", it.message, it)
-                                summarizer.close()
-                            }
-                        }
-                        .addOnFailureListener {
-                            promise.reject("SUMMARIZE_PREPARE_ERROR", it.message, it)
-                            summarizer.close()
-                        }
+            genAiScope.launch {
+                try {
+                    summarizer.checkFeatureStatus().await()
+                    summarizer.prepareInferenceEngine().await()
+
+                    val request = SummarizationRequest.builder(text).build()
+                    val sb = StringBuilder()
+                    summarizer.runInference(request) { token -> sb.append(token) }.await()
+                    promise.resolve(sb.toString())
+                } catch (e: Throwable) {
+                    promise.reject("SUMMARIZE_INFERENCE_ERROR", e.message, e)
+                } finally {
+                    closeQuietly { summarizer.close() }
                 }
-                .addOnFailureListener {
-                    promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI Summarizer is not available on this device. ${it.message}", it)
-                    summarizer.close()
-                }
+            }
         } catch (e: Throwable) {
             promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI is not installed in this build", e)
         }
@@ -559,8 +551,10 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
     override fun rewriteText(text: String, style: String, promise: Promise) {
         try {
             val outputType = when (style) {
-                "professional" -> RewriterOptions.OutputType.FORMAL
-                "friendly", "casual" -> RewriterOptions.OutputType.CASUAL
+                // The union is ELABORATE, EMOJIFY, SHORTEN, FRIENDLY, PROFESSIONAL,
+                // REPHRASE. There is no FORMAL or CASUAL.
+                "professional" -> RewriterOptions.OutputType.PROFESSIONAL
+                "friendly", "casual" -> RewriterOptions.OutputType.FRIENDLY
                 "concise" -> RewriterOptions.OutputType.SHORTEN
                 "creative", "elaborate" -> RewriterOptions.OutputType.ELABORATE
                 else -> RewriterOptions.OutputType.REPHRASE
@@ -570,31 +564,20 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                 .setLanguage(RewriterOptions.Language.ENGLISH)
                 .build()
             val rewriter: Rewriter = Rewriting.getClient(opts)
-            rewriter.checkFeatureStatus()
-                .addOnSuccessListener {
-                    rewriter.prepareInferenceEngine()
-                        .addOnSuccessListener {
-                            val request = RewritingRequest.builder(text).build()
-                            rewriter.runInference(request)
-                                .addOnSuccessListener { res ->
-                                    val first = res.results.firstOrNull()?.text ?: text
-                                    promise.resolve(first)
-                                    rewriter.close()
-                                }
-                                .addOnFailureListener {
-                                    promise.reject("REWRITE_INFERENCE_ERROR", it.message, it)
-                                    rewriter.close()
-                                }
-                        }
-                        .addOnFailureListener {
-                            promise.reject("REWRITE_PREPARE_ERROR", it.message, it)
-                            rewriter.close()
-                        }
+            genAiScope.launch {
+                try {
+                    rewriter.checkFeatureStatus().await()
+                    rewriter.prepareInferenceEngine().await()
+
+                    val request = RewritingRequest.builder(text).build()
+                    val result = rewriter.runInference(request).await()
+                    promise.resolve(result.results.firstOrNull()?.text ?: text)
+                } catch (e: Throwable) {
+                    promise.reject("REWRITE_INFERENCE_ERROR", e.message, e)
+                } finally {
+                    closeQuietly { rewriter.close() }
                 }
-                .addOnFailureListener {
-                    promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI Rewriter is not available on this device. ${it.message}", it)
-                    rewriter.close()
-                }
+            }
         } catch (e: Throwable) {
             promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI is not installed in this build", e)
         }
@@ -606,35 +589,25 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                 .setLanguage(ProofreaderOptions.Language.ENGLISH)
                 .build()
             val proofreader: Proofreader = Proofreading.getClient(opts)
-            proofreader.checkFeatureStatus()
-                .addOnSuccessListener {
-                    proofreader.prepareInferenceEngine()
-                        .addOnSuccessListener {
-                            val request = ProofreadingRequest.builder(text).build()
-                            proofreader.runInference(request)
-                                .addOnSuccessListener { res ->
-                                    val corrected = res.results.firstOrNull()?.text ?: text
-                                    val out = Arguments.createMap().apply {
-                                        putString("correctedText", corrected)
-                                        putArray("corrections", Arguments.createArray())
-                                    }
-                                    promise.resolve(out)
-                                    proofreader.close()
-                                }
-                                .addOnFailureListener {
-                                    promise.reject("PROOFREAD_INFERENCE_ERROR", it.message, it)
-                                    proofreader.close()
-                                }
+            genAiScope.launch {
+                try {
+                    proofreader.checkFeatureStatus().await()
+                    proofreader.prepareInferenceEngine().await()
+
+                    val request = ProofreadingRequest.builder(text).build()
+                    val result = proofreader.runInference(request).await()
+                    promise.resolve(
+                        Arguments.createMap().apply {
+                            putString("correctedText", result.results.firstOrNull()?.text ?: text)
+                            putArray("corrections", Arguments.createArray())
                         }
-                        .addOnFailureListener {
-                            promise.reject("PROOFREAD_PREPARE_ERROR", it.message, it)
-                            proofreader.close()
-                        }
+                    )
+                } catch (e: Throwable) {
+                    promise.reject("PROOFREAD_INFERENCE_ERROR", e.message, e)
+                } finally {
+                    closeQuietly { proofreader.close() }
                 }
-                .addOnFailureListener {
-                    promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI Proofreader is not available on this device. ${it.message}", it)
-                    proofreader.close()
-                }
+            }
         } catch (e: Throwable) {
             promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI is not installed in this build", e)
         }
@@ -643,7 +616,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
     override fun smartReplies(messages: ReadableArray, promise: Promise) {
         val conversation = mutableListOf<TextMessage>()
         for (i in 0 until messages.size()) {
-            val m = messages.getMap(i)
+            val m = messages.getMap(i) ?: continue
             val text = m.getString("text") ?: continue
             val fromUser = if (m.hasKey("fromUser")) m.getBoolean("fromUser") else false
             val ts = if (m.hasKey("timestampMs")) m.getDouble("timestampMs").toLong() else System.currentTimeMillis()
@@ -972,34 +945,20 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
 
             val opts = ImageDescriberOptions.builder(reactContext).build()
             val describer: ImageDescriber = ImageDescription.getClient(opts)
-            describer.checkFeatureStatus()
-                .addOnSuccessListener {
-                    describer.prepareInferenceEngine()
-                        .addOnSuccessListener {
-                            val request = ImageDescriptionRequest.builder(bitmap).build()
-                            describer.runInference(request)
-                                .addOnSuccessListener { res ->
-                                    promise.resolve(res.description ?: "")
-                                    describer.close()
-                                }
-                                .addOnFailureListener {
-                                    promise.reject("DESCRIBE_INFERENCE_ERROR", it.message, it)
-                                    describer.close()
-                                }
-                        }
-                        .addOnFailureListener {
-                            promise.reject("DESCRIBE_PREPARE_ERROR", it.message, it)
-                            describer.close()
-                        }
+            genAiScope.launch {
+                try {
+                    describer.checkFeatureStatus().await()
+                    describer.prepareInferenceEngine().await()
+
+                    val request = ImageDescriptionRequest.builder(bitmap).build()
+                    val result = describer.runInference(request).await()
+                    promise.resolve(result.description ?: "")
+                } catch (e: Throwable) {
+                    promise.reject("DESCRIBE_INFERENCE_ERROR", e.message, e)
+                } finally {
+                    closeQuietly { describer.close() }
                 }
-                .addOnFailureListener {
-                    promise.reject(
-                        "FEATURE_UNAVAILABLE",
-                        "ML Kit GenAI Image Description is not available on this device. ${it.message}",
-                        it
-                    )
-                    describer.close()
-                }
+            }
         } catch (e: Throwable) {
             promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI Image Description is not installed", e)
         }
@@ -1014,7 +973,10 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
             val opts = SelfieSegmenterOptions.Builder()
                 .setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE)
                 .build()
-            SelfieSegmentation.getClient(opts).process(image)
+            // Segmentation.getClient, not SelfieSegmentation: the selfie artifact
+            // supplies the *options*, the client comes from the segmentation
+            // package. There is no SelfieSegmentation type.
+            Segmentation.getClient(opts).process(image)
                 .addOnSuccessListener { mask ->
                     val w = mask.width
                     val h = mask.height
@@ -1072,6 +1034,18 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
     override fun invalidate() {
         genAiScope.cancel()
         super.invalidate()
+    }
+
+    /**
+     * close() on a GenAI client is best-effort teardown. A failure there must
+     * not replace the result already handed to the promise, and a promise can
+     * only be settled once.
+     */
+    private inline fun closeQuietly(close: () -> Unit) {
+        try {
+            close()
+        } catch (_: Throwable) {
+        }
     }
 
     private fun blockedByPrivateMode(promise: Promise, what: String): Boolean {

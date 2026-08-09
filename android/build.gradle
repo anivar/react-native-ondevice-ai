@@ -187,6 +187,13 @@ dependencies {
   // because the code depends on it directly.
   implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
 
+  // ListenableFuture.await(). The four Task-shaped GenAI features are not
+  // Task-shaped at all — checkFeatureStatus(), prepareInferenceEngine() and
+  // runInference() all return Guava ListenableFuture, which has no
+  // addOnSuccessListener. This adds the suspend bridge without pulling in the
+  // whole of Guava, which kotlinx-coroutines-guava would.
+  implementation 'androidx.concurrent:concurrent-futures-ktx:1.2.0'
+
   // ML Kit base APIs (GA, work on all devices)
   implementation 'com.google.mlkit:text-recognition:16.0.1'
   implementation 'com.google.mlkit:object-detection:17.0.2'
