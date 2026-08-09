@@ -41,6 +41,9 @@ if (pkg.files?.length) {
   const { join } = await import('node:path');
   const root = new URL('..', import.meta.url).pathname;
   for (const entry of pkg.files) {
+    // `!pattern` entries exclude rather than include, so there is nothing to
+    // check for existence — and a missing one is the desired state.
+    if (entry.startsWith('!')) continue;
     if (!existsSync(join(root, entry.replace(/\/$/, '')))) {
       problems.push(`package.json "files" lists ${entry}, which does not exist.`);
     }

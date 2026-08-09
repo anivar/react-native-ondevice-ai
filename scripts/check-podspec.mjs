@@ -52,6 +52,18 @@ if (podspecs.length === 1) {
     );
   }
 
+  // Same class of omission on the other platform: react-native.config.js is
+  // how autolinking is told where the Android sources are and which
+  // ReactPackage to construct. Leaving it out of the tarball is invisible
+  // locally, where the file is present, and breaks every consumer.
+  if (existsSync(join(root, 'react-native.config.js')) &&
+      !pkg.files?.includes('react-native.config.js')) {
+    problems.push(
+      'react-native.config.js exists but package.json "files" does not list ' +
+        'it, so Android autolinking would have nothing to read.'
+    );
+  }
+
   // CocoaPods builds the Swift interop header from the module name: s.name
   // with every non-alphanumeric character replaced by an underscore.
   const expectedHeader = `${stem.replace(/[^A-Za-z0-9]/g, '_')}-Swift.h`;

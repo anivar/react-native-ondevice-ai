@@ -17,9 +17,12 @@
   "files": [
     "lib/",
     "src/",
+    "!src/__tests__",
     "ios/",
     "android/",
+    "!android/build",
     "app.plugin.js",
+    "react-native.config.js",
     "README.md",
     "LICENSE",
     "react-native-ondevice-ai.podspec"
