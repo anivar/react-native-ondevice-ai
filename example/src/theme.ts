@@ -1,5 +1,5 @@
 /**
- * OpenSLM palette, taken from the tokens on openslm.ai.
+ * Palette for the example app.
  *
  * The site reads as a standards document: parchment and ink with indigo, one
  * seal-red for anything that stops you, and sage for a healthy status. Keeping

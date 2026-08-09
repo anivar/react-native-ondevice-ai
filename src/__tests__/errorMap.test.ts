@@ -18,7 +18,7 @@ import { ErrorCodes } from '../errors';
 const ROOT = join(__dirname, '..', '..');
 
 const NATIVE_FILES = [
-  'android/src/main/java/com/openslm/mobileaitoolkit/AIToolkitTurboModule.kt',
+  'android/src/main/java/com/anivar/ondeviceai/AIToolkitTurboModule.kt',
   'ios/AIToolkitTurboModule.mm',
   'ios/AIToolkitFoundationModels.swift',
 ];

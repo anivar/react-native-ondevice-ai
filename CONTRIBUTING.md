@@ -6,8 +6,8 @@ useful thing to know about this repository is what its gates check and why.
 ## Setup
 
 ```bash
-git clone https://github.com/openslm-ai/mobile-ai-toolkit
-cd mobile-ai-toolkit
+git clone https://github.com/anivar/react-native-ondevice-ai
+cd react-native-ondevice-ai
 npm install
 npm test
 ```
@@ -68,9 +68,7 @@ most code changes right now.
 
 ## Principles
 
-This package is built to the [Open Small Models
-Accord](https://openslm.ai/accord). Two clauses come up in review often enough
-to state here:
+Two of these come up in review often enough to state here:
 
 - **Inference stays local.** There is no cloud tier, and a PR adding one would
   need to change the package description, the README, and the network gate in

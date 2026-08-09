@@ -1,6 +1,6 @@
-// mobile-ai-toolkit — an OpenSLM project. https://github.com/openslm-ai
+// react-native-ondevice-ai — https://github.com/anivar/react-native-ondevice-ai
 //
-// Apple Foundation Models bridge for mobile-ai-toolkit.
+// Apple Foundation Models bridge for react-native-ondevice-ai.
 // Requires iOS 26+ on Apple-Intelligence-capable hardware (A17 Pro, M-series).
 // On older OS or unsupported hardware the Objective-C++ caller must guard with
 // @available and SystemLanguageModel.default.availability before invoking us.

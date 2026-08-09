@@ -1,4 +1,4 @@
-// mobile-ai-toolkit — an OpenSLM project. https://github.com/openslm-ai
+// react-native-ondevice-ai — https://github.com/anivar/react-native-ondevice-ai
 #import "AIToolkitTurboModule.h"
 #import <Vision/Vision.h>
 #import <NaturalLanguage/NaturalLanguage.h>

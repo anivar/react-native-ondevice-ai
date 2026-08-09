@@ -1,5 +1,5 @@
-// mobile-ai-toolkit — an OpenSLM project. https://github.com/openslm-ai
-package com.openslm.mobileaitoolkit
+// react-native-ondevice-ai — https://github.com/anivar/react-native-ondevice-ai
+package com.anivar.ondeviceai
 
 import android.graphics.BitmapFactory
 import android.os.Build

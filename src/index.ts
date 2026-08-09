@@ -1,5 +1,5 @@
 /**
- * mobile-ai-toolkit
+ * react-native-ondevice-ai
  *
  * Thin TurboModule wrapper over real on-device AI APIs:
  *  - iOS:     Vision, NaturalLanguage, Speech, UITextChecker

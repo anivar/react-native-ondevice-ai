@@ -16,19 +16,15 @@
   actually compiled rather than silently skipped.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) explains what each gate exists to catch.
 
-## About OpenSLM
+## Names this package has had
 
-`mobile-ai-toolkit` is part of [OpenSLM](https://openslm.ai) — open small
-language models and the runtimes that make them usable on the hardware people
-actually own.
-
-This package was briefly published under a personal scope. That package has
-been removed; `mobile-ai-toolkit` is the only name.
+It was published briefly as `@anivar/mobile-ai-toolkit`, then as
+`mobile-ai-toolkit`. Both are gone; `react-native-ondevice-ai` is the only
+name, and the repository redirects from the old ones.
 
 ## Citing this
 
 Releases are archived with a DOI. `CITATION.cff` carries the metadata GitHub's
-"Cite this repository" button reads, including the LWD-R disclosure, so a
-citation records what layers the release actually meets rather than only its
-name.
+"Cite this repository" button reads, including what the release does and does not ship, so a citation records that
+rather than only its name.
 

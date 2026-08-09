@@ -18,7 +18,7 @@ module.exports = {
     platforms: {
       android: {
         sourceDir: 'android',
-        packageImportPath: 'import com.openslm.mobileaitoolkit.AIToolkitPackage;',
+        packageImportPath: 'import com.anivar.ondeviceai.AIToolkitPackage;',
         packageInstance: 'new AIToolkitPackage()',
       },
       ios: {},

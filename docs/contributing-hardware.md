@@ -11,7 +11,7 @@ effort. **If you own any of these, ten minutes closes it:**
 with Apple Intelligence enabled in **Settings → Apple Intelligence & Siri**.
 
 ```ts
-import { getDeviceCapabilities, explainCall, generateText } from 'mobile-ai-toolkit';
+import { getDeviceCapabilities, explainCall, generateText } from 'react-native-ondevice-ai';
 
 console.log((await getDeviceCapabilities()).availability.generate);
 console.log(await explainCall('generate'));

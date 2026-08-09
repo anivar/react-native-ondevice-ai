@@ -1,17 +1,17 @@
 {
   "expo": {
     "name": "Mobile AI Toolkit Example",
-    "slug": "mobile-ai-toolkit-example",
+    "slug": "react-native-ondevice-ai-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "ai.openslm.mobileaitoolkit.example",
+      "bundleIdentifier": "net.anivar.ondeviceai.example",
       "supportsTablet": true
     },
     "android": {
-      "package": "ai.openslm.mobileaitoolkit.example"
+      "package": "net.anivar.ondeviceai.example"
     },
-    "plugins": ["mobile-ai-toolkit"]
+    "plugins": ["react-native-ondevice-ai"]
   }
 }

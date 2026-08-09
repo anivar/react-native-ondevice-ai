@@ -1,7 +1,7 @@
 {
-  "name": "mobile-ai-toolkit",
+  "name": "react-native-ondevice-ai",
   "version": "2.2.1",
-  "description": "On-device AI for React Native. Nothing leaves the device. One API shape, per-platform behaviour, fully disclosed.",
+  "description": "On-device AI for React Native: text, vision, speech and generative models via Apple Vision/NaturalLanguage/Speech/Foundation Models and Google ML Kit. Nothing leaves the device.",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
@@ -37,31 +37,36 @@
     "prepublishOnly": "npm run check && npm run build"
   },
   "keywords": [
-    "ai",
-    "mobile",
     "react-native",
-    "toolkit",
-    "machine-learning",
-    "openai",
-    "gemini",
-    "claude",
-    "llm",
-    "mobile-ai",
-    "artificial-intelligence",
-    "chat",
+    "on-device-ai",
+    "ondevice",
+    "offline-ai",
+    "local-ai",
+    "turbomodule",
+    "new-architecture",
+    "expo",
+    "ml-kit",
+    "gemini-nano",
+    "apple-intelligence",
+    "foundation-models",
+    "ocr",
     "vision",
-    "voice",
-    "text-analysis"
+    "speech-to-text",
+    "text-analysis",
+    "summarization",
+    "privacy",
+    "ios",
+    "android"
   ],
-  "author": "Anivar Aravind <anivar@openslm.ai>",
+  "author": "Anivar Aravind <anivar.aravind@gmail.com>",
   "license": "MIT",
-  "homepage": "https://openslm.ai",
+  "homepage": "https://github.com/anivar/react-native-ondevice-ai#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/openslm-ai/mobile-ai-toolkit.git"
+    "url": "git+https://github.com/anivar/react-native-ondevice-ai.git"
   },
   "bugs": {
-    "url": "https://github.com/openslm-ai/mobile-ai-toolkit/issues"
+    "url": "https://github.com/anivar/react-native-ondevice-ai/issues"
   },
   "funding": "https://github.com/sponsors/anivar",
   "peerDependencies": {
@@ -91,7 +96,7 @@
     "type": "modules",
     "jsSrcsDir": "src/specs",
     "android": {
-      "javaPackageName": "com.openslm.mobileaitoolkit"
+      "javaPackageName": "com.anivar.ondeviceai"
     }
   },
   "type": "commonjs"

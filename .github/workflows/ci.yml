@@ -113,7 +113,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          path: mobile-ai-toolkit
+          path: react-native-ondevice-ai
 
       - uses: actions/setup-node@v6
         with:
@@ -135,18 +135,23 @@ jobs:
         working-directory: HostApp
         run: |
           npm install
-          npm install ../mobile-ai-toolkit
+          npm install ../react-native-ondevice-ai
 
       # The mirror of the iOS deployment-target step below. React Native 0.86's
       # template ships minSdkVersion 24; ML Kit GenAI declares 26, and the
       # manifest merger refuses to build the app without it. This is the exact
       # step docs/setup.md asks a bare React Native developer to perform, and
       # the one the Expo config plugin performs for them.
-      - name: Raise the host app's minSdkVersion
+      # Kotlin too: the ML Kit GenAI artifacts are built with Kotlin 2.3, and a
+      # 2.1 compiler refuses their metadata outright — "Module was compiled with
+      # an incompatible version of Kotlin", once per artifact. Both values are
+      # what the Expo config plugin writes for Expo apps.
+      - name: Raise the host app's minSdkVersion and Kotlin
         working-directory: HostApp/android
         run: |
           sed -i "s/minSdkVersion = 24/minSdkVersion = 26/" build.gradle
-          grep -n "minSdkVersion" build.gradle
+          sed -i "s/kotlinVersion = \".*\"/kotlinVersion = \"2.3.21\"/" build.gradle
+          grep -nE "minSdkVersion|kotlinVersion" build.gradle
 
       # pipefail is not optional: without it the step exits with tee's status,
       # so a FAILED compile reports success.
@@ -163,21 +168,21 @@ jobs:
       - name: Assert the library was actually compiled
         if: always()
         run: |
-          if ! grep -qE 'Task :anivar_mobile-ai-toolkit:compile.*Kotlin' /tmp/gradle.log; then
+          if ! grep -qE 'Task :react-native-ondevice-ai:compile.*Kotlin' /tmp/gradle.log; then
             echo "::error::The host app built without compiling this library."
             echo "::error::Autolinking did not pick it up, so this run verified nothing."
             echo "Gradle tasks that did run:"
             grep -oE '> Task :[^ ]+' /tmp/gradle.log | sort -u
             exit 1
           fi
-          if grep -qE 'Task :anivar_mobile-ai-toolkit:[^ ]+ FAILED' /tmp/gradle.log; then
+          if grep -qE 'Task :react-native-ondevice-ai:[^ ]+ FAILED' /tmp/gradle.log; then
             echo "::error::A task belonging to this library failed:"
-            grep -oE '> Task :anivar_mobile-ai-toolkit:[^ ]+ FAILED' /tmp/gradle.log | sort -u
+            grep -oE '> Task :react-native-ondevice-ai:[^ ]+ FAILED' /tmp/gradle.log | sort -u
             grep -E '^e: ' /tmp/gradle.log | head -40
             exit 1
           fi
           echo "Library compiled:"
-          grep -oE '> Task :anivar_mobile-ai-toolkit:[^ ]+' /tmp/gradle.log | sort -u
+          grep -oE '> Task :react-native-ondevice-ai:[^ ]+' /tmp/gradle.log | sort -u
 
   # macOS runners are free for public repositories, so the Swift and ObjC++ can
   # at least be compiled. Compiling is not verifying: Foundation Models needs
@@ -188,7 +193,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          path: mobile-ai-toolkit
+          path: react-native-ondevice-ai
 
       - uses: actions/setup-node@v6
         with:
@@ -211,7 +216,7 @@ jobs:
         working-directory: HostApp
         run: |
           npm install
-          npm install ../mobile-ai-toolkit
+          npm install ../react-native-ondevice-ai
 
       # A consuming app must raise its deployment target to match this pod.
       # React Native 0.86's template ships 15.1, and CocoaPods refuses to
@@ -233,7 +238,7 @@ jobs:
       # Eighteen of twenty methods once carried a selector the JSI layer never
       # calls, and clang reported it only as a warning.
       - name: iOS selectors match the generated TurboModule protocol
-        working-directory: mobile-ai-toolkit
+        working-directory: react-native-ondevice-ai
         run: |
           HEADER=$(find "$GITHUB_WORKSPACE/HostApp" -name 'AIToolkitTurboModuleSpec.h' -print -quit)
           if [ -z "$HEADER" ]; then
@@ -267,7 +272,7 @@ jobs:
       # compiles to an empty branch on an SDK that lacks the framework. Assert
       # the branch was actually taken.
       - name: Assert FoundationModels was compiled, not skipped
-        working-directory: mobile-ai-toolkit
+        working-directory: react-native-ondevice-ai
         run: |
           if ! xcrun --sdk iphonesimulator --show-sdk-version | grep -qE '^(2[6-9]|[3-9][0-9])'; then
             echo "::error::Runner SDK is older than iOS 26, so every"

@@ -1,6 +1,6 @@
 # Mobile AI Toolkit — example
 
-An Expo app that shows what `mobile-ai-toolkit` can actually do **on
+An Expo app that shows what `react-native-ondevice-ai` can actually do **on
 your device**, which is the only question that matters for a package like this.
 
 Most on-device AI demos show generation working on the one phone the author
@@ -49,5 +49,4 @@ after `npm run build` in the repository root.
 
 ---
 
-Part of [OpenSLM](https://openslm.ai) · built to the
-[Open Small Models Accord](https://openslm.ai/accord)
+[react-native-ondevice-ai](https://github.com/anivar/react-native-ondevice-ai)

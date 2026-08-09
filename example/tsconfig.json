@@ -5,7 +5,7 @@
     "jsx": "react-native",
     "rootDir": "..",
     "paths": {
-      "mobile-ai-toolkit": ["../src/index"]
+      "react-native-ondevice-ai": ["../src/index"]
     },
     "ignoreDeprecations": "6.0",
     "types": ["react-native", "@types/react"]

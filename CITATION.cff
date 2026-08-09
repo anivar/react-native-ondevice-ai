@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "mobile-ai-toolkit: on-device AI for React Native"
+title: "react-native-ondevice-ai: on-device AI for React Native"
 message: "If you reference this software, please cite it using this metadata."
 type: software
 authors:
@@ -7,8 +7,8 @@ authors:
     given-names: "Anivar A"
     orcid: "https://orcid.org/0009-0009-8995-0005"
     website: "https://anivar.net"
-repository-code: "https://github.com/openslm-ai/mobile-ai-toolkit"
-url: "https://openslm.ai"
+repository-code: "https://github.com/anivar/react-native-ondevice-ai"
+url: "https://github.com/anivar/react-native-ondevice-ai"
 license: MIT
 keywords:
   - on-device AI
@@ -34,17 +34,6 @@ abstract: >-
   directly, with a reason and a permanence distinction, so an application can
   tell "not yet" from "never here".
 
-  Built to the Open Small Models Accord (https://openslm.ai/accord). Under the
-  Accord's LWD-R disclosure layers this release is Logic only: it ships
-  inference and routing code, and no weights, training data, or representational
-  schema of its own. It provides inference forkability, not training
-  forkability, and the models it binds to are closed runtimes on proprietary
-  hardware.
-references:
-  - type: standard
-    title: "The Open Small Models Accord"
-    version: "0.2"
-    url: "https://openslm.ai/accord"
-    authors:
-      - given-names: Anivar
-        family-names: Aravind
+  This release ships inference and routing code only: no weights, no training
+  data, no representational schema of its own. The models it binds to are
+  closed runtimes on proprietary hardware.

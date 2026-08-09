@@ -11,15 +11,6 @@
  * whether it was degraded, so a fallback is never mistaken for a model.
  */
 
-import {
-  type CallExplanation,
-  type DeviceCapabilities,
-  explainCall,
-  getDeviceCapabilities,
-  isAIError,
-  type SummarizeResult,
-  summarize,
-} from 'mobile-ai-toolkit';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -31,6 +22,15 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import {
+  type CallExplanation,
+  type DeviceCapabilities,
+  explainCall,
+  getDeviceCapabilities,
+  isAIError,
+  type SummarizeResult,
+  summarize,
+} from 'react-native-ondevice-ai';
 import { dark, light, stateColor, type Theme } from './theme';
 
 const ARTICLE = [
@@ -87,8 +87,8 @@ export default function App() {
             <Text style={s.markText}>SLM</Text>
           </View>
           <View>
-            <Text style={s.brand}>OpenSLM</Text>
-            <Text style={s.brandSub}>mobile-ai-toolkit</Text>
+            <Text style={s.brand}>on-device AI</Text>
+            <Text style={s.brandSub}>react-native-ondevice-ai</Text>
           </View>
         </View>
 
@@ -164,7 +164,7 @@ export default function App() {
           </View>
         )}
 
-        <Text style={s.footer}>openslm.ai · Open Small Models Accord</Text>
+        <Text style={s.footer}>react-native-ondevice-ai</Text>
       </ScrollView>
     </SafeAreaView>
   );

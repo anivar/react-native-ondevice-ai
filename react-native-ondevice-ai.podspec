@@ -18,7 +18,7 @@ Pod::Spec.new do |s|
   # makes every non-generative feature here unconditional; only Foundation
   # Models (iOS 26+) is still gated.
   s.platforms    = { :ios => "17.0" }
-  s.source       = { :git => "https://github.com/openslm-ai/mobile-ai-toolkit.git", :tag => "#{s.version}" }
+  s.source       = { :git => "https://github.com/anivar/react-native-ondevice-ai.git", :tag => "#{s.version}" }
 
   s.source_files = [
     "ios/**/*.{h,m,mm,swift}",
