@@ -1,4 +1,4 @@
-# react-native-ondevice-ai
+# react-native-ai-gateway
 
 **On-device AI for React Native.** Text, vision, speech and generative models, using the frameworks the phone already ships — Apple Vision, NaturalLanguage, Speech and Foundation Models on iOS, Google ML Kit on Android.
 
@@ -13,11 +13,9 @@ No JS runtime dependencies. MIT.
 npm install react-native-ai-gateway
 ```
 
-The npm package is `react-native-ai-gateway`; the source lives in this
-`react-native-ondevice-ai` repository. Every spelling of "on-device ai" close
-enough to describe what this package does collided with an existing,
-unrelated package on npm, so the published name differs from the project
-name. Nothing leaves the device — see below — the name is about unifying
+Every spelling of "on-device ai" close enough to describe this package
+collided with an existing, unrelated npm package, which is where the name
+comes from. Nothing leaves the device — see below — this is about unifying
 access to whatever AI the platform already has, not a network gateway.
 
 **Expo** — add the plugin and rebuild. It sets the SDK floors and the speech usage string for you:
@@ -26,7 +24,7 @@ access to whatever AI the platform already has, not a network gateway.
 { "expo": { "plugins": ["react-native-ai-gateway"] } }
 ```
 
-**Bare React Native** — raise `ios/Podfile` to `platform :ios, '17.0'` and `minSdkVersion` to `26`, then `pod install`. Both floors are required, not advisory: [why](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/setup.md).
+**Bare React Native** — raise `ios/Podfile` to `platform :ios, '17.0'` and `minSdkVersion` to `26`, then `pod install`. Both floors are required, not advisory: [why](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/setup.md).
 
 A development build, not Expo Go.
 
@@ -79,22 +77,22 @@ This comes from ML Kit's `checkFeatureStatus()` and Apple's `SystemLanguageModel
 | Proofread | ✅ (UITextChecker, always) | AICore, generative |
 | Summarize, rewrite, generate, chat | iOS 26 + Apple Intelligence | AICore devices |
 
-The two platforms genuinely differ, and this package does not pretend otherwise: a call that a platform cannot do rejects with a typed `AIError` naming the reason, never a polyfill or a placeholder string. Full table: [docs/capabilities.md](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/capabilities.md).
+The two platforms genuinely differ, and this package does not pretend otherwise: a call that a platform cannot do rejects with a typed `AIError` naming the reason, never a polyfill or a placeholder string. Full table: [docs/capabilities.md](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/capabilities.md).
 
 On Android, where most devices have no generative model, `summarize()` falls back to a bundled extractive summariser that selects sentences and never composes new text, so it cannot invent anything — results carry `degraded: true` and the route that produced them. iOS defaults to an honest rejection instead of that fallback, since Apple ships a real summariser on eligible hardware and a silently worse result on everything else is not a favour; opt in with `configure({ ios: { tiers: ['on-device', 'local-deterministic'] } })` if you want it anyway.
 
 ## Docs
 
-- [Setup](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/setup.md) — platform floors, Expo plugin, the one Android permission
-- [Capabilities](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/capabilities.md) — every method, and reading availability
-- [Guide](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/guide.md) — usage, private mode, device-class gotchas
-- [Provenance](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/provenance.md) — supply chain, citation
+- [Setup](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/setup.md) — platform floors, Expo plugin, the one Android permission
+- [Capabilities](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/capabilities.md) — every method, and reading availability
+- [Guide](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/guide.md) — usage, private mode, device-class gotchas
+- [Provenance](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/provenance.md) — supply chain, citation
 
 ## Status
 
 CI compiles every line of Kotlin, Swift and ObjC++ on each pull request, inside a generated host app, and asserts this library was actually linked and that none of its build tasks failed. It runs nothing — no job executes a native path on a device or emulator. The native sources are also checked for networking symbols, the Android manifest for permissions beyond an allowlist, and the podspec for agreement with the manifest it ships in.
 
-The generative routes additionally need hardware no CI runner has at all: an Apple Intelligence iPhone for Foundation Models, an AICore Android for ML Kit GenAI. The example app has a screen that exercises the public API and produces a shareable report; if you own one of those devices, [that report is the most useful thing anyone can send](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/contributing-hardware.md).
+The generative routes additionally need hardware no CI runner has at all: an Apple Intelligence iPhone for Foundation Models, an AICore Android for ML Kit GenAI. The example app has a screen that exercises the public API and produces a shareable report; if you own one of those devices, [that report is the most useful thing anyone can send](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/contributing-hardware.md).
 
 ## About
 

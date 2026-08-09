@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "On-device AI Example",
-    "slug": "react-native-ondevice-ai-example",
+    "slug": "react-native-ai-gateway-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "newArchEnabled": true,

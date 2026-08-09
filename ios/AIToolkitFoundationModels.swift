@@ -1,6 +1,6 @@
-// react-native-ondevice-ai — https://github.com/anivar/react-native-ondevice-ai
+// react-native-ai-gateway — https://github.com/anivar/react-native-ai-gateway
 //
-// Apple Foundation Models bridge for react-native-ondevice-ai.
+// Apple Foundation Models bridge for react-native-ai-gateway.
 // Requires iOS 26+ on Apple-Intelligence-capable hardware (A17 Pro, M-series).
 // On older OS or unsupported hardware the Objective-C++ caller must guard with
 // @available and SystemLanguageModel.default.availability before invoking us.

@@ -118,7 +118,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          path: react-native-ondevice-ai
+          path: react-native-ai-gateway
 
       - uses: actions/setup-node@v6
         with:
@@ -140,7 +140,7 @@ jobs:
         working-directory: HostApp
         run: |
           npm install
-          npm install ../react-native-ondevice-ai
+          npm install ../react-native-ai-gateway
 
       # The mirror of the iOS deployment-target step below. React Native 0.86's
       # template ships minSdkVersion 24; ML Kit GenAI declares 26, and the
@@ -166,11 +166,8 @@ jobs:
       # reported success. A build that does not include the library under test
       # proves nothing, so assert the Kotlin was actually compiled.
       #
-      # The Gradle module name below is react-native-ai-gateway — the npm
-      # package name from package.json, which is what autolinking uses to
-      # name the project — and deliberately does not match this repo's own
-      # directory name (react-native-ondevice-ai). Every spelling close to
-      # "on-device ai" collided with an existing, unrelated npm package.
+      # The Gradle module name below is derived from package.json's "name",
+      # which is what autolinking uses to name the project.
       - name: Assert the library was actually compiled
         if: always()
         run: |
@@ -199,7 +196,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          path: react-native-ondevice-ai
+          path: react-native-ai-gateway
 
       - uses: actions/setup-node@v6
         with:
@@ -222,7 +219,7 @@ jobs:
         working-directory: HostApp
         run: |
           npm install
-          npm install ../react-native-ondevice-ai
+          npm install ../react-native-ai-gateway
 
       # A consuming app must raise its deployment target to match this pod.
       # React Native 0.86's template ships 15.1, and CocoaPods refuses to
@@ -244,7 +241,7 @@ jobs:
       # Eighteen of twenty methods once carried a selector the JSI layer never
       # calls, and clang reported it only as a warning.
       - name: iOS selectors match the generated TurboModule protocol
-        working-directory: react-native-ondevice-ai
+        working-directory: react-native-ai-gateway
         run: |
           HEADER=$(find "$GITHUB_WORKSPACE/HostApp" -name 'AIToolkitTurboModuleSpec.h' -print -quit)
           if [ -z "$HEADER" ]; then
@@ -278,7 +275,7 @@ jobs:
       # compiles to an empty branch on an SDK that lacks the framework. Assert
       # the branch was actually taken.
       - name: Assert FoundationModels was compiled, not skipped
-        working-directory: react-native-ondevice-ai
+        working-directory: react-native-ai-gateway
         run: |
           if ! xcrun --sdk iphonesimulator --show-sdk-version | grep -qE '^(2[6-9]|[3-9][0-9])'; then
             echo "::error::Runner SDK is older than iOS 26, so every"

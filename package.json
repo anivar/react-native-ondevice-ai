@@ -25,7 +25,7 @@
     "react-native.config.js",
     "README.md",
     "LICENSE",
-    "react-native-ondevice-ai.podspec"
+    "react-native-ai-gateway.podspec"
   ],
   "scripts": {
     "build": "tsc",
@@ -63,13 +63,13 @@
   ],
   "author": "Anivar Aravind <anivar.aravind@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/anivar/react-native-ondevice-ai#readme",
+  "homepage": "https://github.com/anivar/react-native-ai-gateway#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anivar/react-native-ondevice-ai.git"
+    "url": "git+https://github.com/anivar/react-native-ai-gateway.git"
   },
   "bugs": {
-    "url": "https://github.com/anivar/react-native-ondevice-ai/issues"
+    "url": "https://github.com/anivar/react-native-ai-gateway/issues"
   },
   "funding": "https://github.com/sponsors/anivar",
   "peerDependencies": {

@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "react-native-ondevice-ai: on-device AI for React Native"
+title: "react-native-ai-gateway: on-device AI for React Native"
 message: "If you reference this software, please cite it using this metadata."
 type: software
 authors:
@@ -7,8 +7,8 @@ authors:
     given-names: "Anivar A"
     orcid: "https://orcid.org/0009-0009-8995-0005"
     website: "https://anivar.net"
-repository-code: "https://github.com/anivar/react-native-ondevice-ai"
-url: "https://github.com/anivar/react-native-ondevice-ai"
+repository-code: "https://github.com/anivar/react-native-ai-gateway"
+url: "https://github.com/anivar/react-native-ai-gateway"
 license: MIT
 keywords:
   - on-device AI

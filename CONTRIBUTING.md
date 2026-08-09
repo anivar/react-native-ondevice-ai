@@ -6,8 +6,8 @@ useful thing to know about this repository is what its gates check and why.
 ## Setup
 
 ```bash
-git clone https://github.com/anivar/react-native-ondevice-ai
-cd react-native-ondevice-ai
+git clone https://github.com/anivar/react-native-ai-gateway
+cd react-native-ai-gateway
 npm install
 npm test
 ```

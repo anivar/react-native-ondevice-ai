@@ -71,4 +71,4 @@ GenAI. The example app ships a screen that exercises most of the public API
 and produces a shareable report, and a report from one of those devices is
 worth more than most code changes right now.
 
-[0.1.0]: https://github.com/anivar/react-native-ondevice-ai/releases/tag/v0.1.0
+[0.1.0]: https://github.com/anivar/react-native-ai-gateway/releases/tag/v0.1.0

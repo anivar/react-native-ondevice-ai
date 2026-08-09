@@ -1,4 +1,4 @@
-// react-native-ondevice-ai — https://github.com/anivar/react-native-ondevice-ai
+// react-native-ai-gateway — https://github.com/anivar/react-native-ai-gateway
 package com.anivar.ondeviceai
 
 import android.graphics.BitmapFactory

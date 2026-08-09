@@ -1,4 +1,4 @@
-// react-native-ondevice-ai — https://github.com/anivar/react-native-ondevice-ai
+// react-native-ai-gateway — https://github.com/anivar/react-native-ai-gateway
 #import "AIToolkitTurboModule.h"
 #import <Vision/Vision.h>
 #import <NaturalLanguage/NaturalLanguage.h>
@@ -15,8 +15,8 @@
 // non-alphanumeric character replaced by an underscore. If it ever stops
 // matching, __has_include simply fails and the Foundation Models bridge
 // compiles out silently — which is what check-podspec.mjs guards against.
-#if __has_include("react_native_ondevice_ai-Swift.h")
-#import "react_native_ondevice_ai-Swift.h"
+#if __has_include("react_native_ai_gateway-Swift.h")
+#import "react_native_ai_gateway-Swift.h"
 #define AI_HAS_FOUNDATION_BRIDGE 1
 #endif
 

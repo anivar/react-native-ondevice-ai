@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in `react-native-ondevice-ai`, please report it privately via GitHub's [private vulnerability reporting](https://github.com/anivar/react-native-ondevice-ai/security/advisories/new).
+If you discover a security vulnerability in `react-native-ai-gateway`, please report it privately via GitHub's [private vulnerability reporting](https://github.com/anivar/react-native-ai-gateway/security/advisories/new).
 
 Please do not open a public issue for security-sensitive reports.
 

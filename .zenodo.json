@@ -1,5 +1,5 @@
 {
-  "title": "react-native-ondevice-ai: on-device AI for React Native",
+  "title": "react-native-ai-gateway: on-device AI for React Native",
   "description": "<p>A React Native TurboModule binding to the on-device AI frameworks both mobile platforms already ship: Apple Vision, NaturalLanguage, Speech and Foundation Models on iOS, and Google ML Kit including ML Kit GenAI on Android. Inference runs on the device; the package contains no network path, enforced by a build gate rather than asserted.</p><p>Its distinguishing concern is honest availability. Both platforms expose per-feature signals &mdash; ML Kit's <code>checkFeatureStatus()</code> and Apple's <code>SystemLanguageModel.availability</code> &mdash; and both are commonly discarded in favour of boolean flags reporting whether classes were linked rather than whether a device can run them. This package surfaces the platform signals directly, with a reason and a permanence distinction, so an application can tell &quot;not yet&quot; from &quot;never here&quot;.</p><p>This release ships inference and routing code only: no weights, no training data, no representational schema of its own. The models it binds to are closed runtimes on proprietary hardware.</p>",
   "upload_type": "software",
   "license": "MIT",
@@ -22,7 +22,7 @@
   ],
   "related_identifiers": [
     {
-      "identifier": "https://www.npmjs.com/package/react-native-ondevice-ai",
+      "identifier": "https://www.npmjs.com/package/react-native-ai-gateway",
       "relation": "isIdenticalTo",
       "resource_type": "software"
     }
