@@ -97,3 +97,20 @@ this call succeed" — so it was removed rather than deprecated.
 
 Every rejection is an `AIError` with a `code` you can switch on — `FEATURE_UNAVAILABLE`, `MODEL_NOT_DOWNLOADED`, `MODEL_DOWNLOAD_TIMEOUT`, `INFERENCE_FAILED`, `MODULE_NOT_LINKED` and a few more — plus `platformCode`, the platform's own more specific string. `isTransient(err)` is true when the feature could work later on this device, which is the distinction a retry button needs.
 
+## Languages the generative features accept
+
+ML Kit's GenAI features are per-language models, and the sets differ. This
+package identifies the language of your text and selects the matching model —
+language identification is already a dependency, so it costs nothing — and
+rejects with `UNSUPPORTED_LANGUAGE` when the text is in a language the feature
+does not have. Text too short to identify falls back to English.
+
+| Feature | Languages |
+|---|---|
+| `summarizeText` | English, Japanese, Korean |
+| `rewriteText` | English, Japanese, German, French, Italian, Spanish, Korean |
+| `proofreadText` | English, Japanese, German, French, Italian, Spanish, Korean |
+| `describeImage` | English |
+
+`generateText` and `chat` go through the Prompt API, which takes no language
+parameter.

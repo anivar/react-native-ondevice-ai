@@ -13,6 +13,7 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
+import com.google.android.gms.tasks.Task
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.genai.common.FeatureStatus
@@ -68,7 +69,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
@@ -218,6 +222,70 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
      * DOWNLOADING.
      */
     /**
+     * Awaits a Play Services Task. The GenAI features return Guava
+     * ListenableFuture and have `await()` from androidx.concurrent; the rest of
+     * ML Kit returns Task, which does not, and one small bridge is cheaper than
+     * a dependency on kotlinx-coroutines-play-services for a single call.
+     */
+    private suspend fun <T> Task<T>.awaitTask(): T = suspendCancellableCoroutine { cont ->
+        addOnSuccessListener { cont.resume(it) }
+        addOnFailureListener { cont.resumeWithException(it) }
+    }
+
+    /**
+     * Picks the model language for a GenAI feature from the text itself.
+     *
+     * These three features each take a language and each support a different
+     * set of them — summarization does English, Japanese and Korean; rewriting
+     * and proofreading add German, French, Italian and Spanish. Passing English
+     * regardless, which is what this did, means Japanese input is handed to a
+     * model configured for English and the caller is never told.
+     *
+     * Language identification is already a dependency of this package, so the
+     * detection costs no bytes. Undetermined text falls back to English rather
+     * than rejecting: it is usually short, and a rejection there would be
+     * worse than a guess the caller can override by sending more text.
+     *
+     * Returns null when the language is determined and unsupported, which the
+     * caller turns into UNSUPPORTED_LANGUAGE.
+     */
+    private suspend fun genAiLanguageFor(text: String, supported: Map<String, Int>): Int? {
+        val tag = try {
+            LanguageIdentification.getClient().identifyLanguage(text).awaitTask()
+        } catch (_: Throwable) {
+            "und"
+        }
+        if (tag == "und") return supported.getValue("en")
+        return supported[tag.substringBefore('-').lowercase()]
+    }
+
+    private val summarizerLanguages = mapOf(
+        "en" to SummarizerOptions.Language.ENGLISH,
+        "ja" to SummarizerOptions.Language.JAPANESE,
+        "ko" to SummarizerOptions.Language.KOREAN,
+    )
+
+    private val rewriterLanguages = mapOf(
+        "en" to RewriterOptions.Language.ENGLISH,
+        "ja" to RewriterOptions.Language.JAPANESE,
+        "de" to RewriterOptions.Language.GERMAN,
+        "fr" to RewriterOptions.Language.FRENCH,
+        "it" to RewriterOptions.Language.ITALIAN,
+        "es" to RewriterOptions.Language.SPANISH,
+        "ko" to RewriterOptions.Language.KOREAN,
+    )
+
+    private val proofreaderLanguages = mapOf(
+        "en" to ProofreaderOptions.Language.ENGLISH,
+        "ja" to ProofreaderOptions.Language.JAPANESE,
+        "de" to ProofreaderOptions.Language.GERMAN,
+        "fr" to ProofreaderOptions.Language.FRENCH,
+        "it" to ProofreaderOptions.Language.ITALIAN,
+        "es" to ProofreaderOptions.Language.SPANISH,
+        "ko" to ProofreaderOptions.Language.KOREAN,
+    )
+
+    /**
      * AICore says *why* it failed, and the reason is usually actionable.
      *
      * GenAiException carries an error code covering cases a caller can do
@@ -290,6 +358,13 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
         )
     }
 
+    /**
+     * Probes with the English model. AICore downloads models per language, so a
+     * device could in principle answer differently for another one; nothing in
+     * the API exposes that, and `availability` is a per-feature question here
+     * rather than a per-language one. Worth revisiting if a device ever reports
+     * available for English and not for Japanese.
+     */
     private suspend fun probeFeature(feature: GenAiFeature): WritableMap = try {
         when (feature) {
             GenAiFeature.SUMMARIZE -> {
@@ -649,17 +724,37 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
     // ---- Generative (ML Kit GenAI, Beta) ----
 
     override fun summarizeText(text: String, format: String, promise: Promise) {
-        try {
-            val opts = SummarizerOptions.builder(reactContext)
-                .setInputType(SummarizerOptions.InputType.ARTICLE)
-                .setOutputType(
-                    if (format == "bullets") SummarizerOptions.OutputType.THREE_BULLETS
-                    else SummarizerOptions.OutputType.ONE_BULLET
+        genAiScope.launch {
+            val language = genAiLanguageFor(text, summarizerLanguages)
+            if (language == null) {
+                promise.reject(
+                    "UNSUPPORTED_LANGUAGE",
+                    "ML Kit summarization supports English, Japanese and Korean."
                 )
-                .setLanguage(SummarizerOptions.Language.ENGLISH)
-                .build()
-            val summarizer: Summarizer = Summarization.getClient(opts)
-            genAiScope.launch {
+                return@launch
+            }
+
+            val summarizer: Summarizer = try {
+                Summarization.getClient(
+                    SummarizerOptions.builder(reactContext)
+                        .setInputType(SummarizerOptions.InputType.ARTICLE)
+                        .setOutputType(
+                            if (format == "bullets") SummarizerOptions.OutputType.THREE_BULLETS
+                            else SummarizerOptions.OutputType.ONE_BULLET
+                        )
+                        .setLanguage(language)
+                        .build()
+                )
+            } catch (e: Throwable) {
+                promise.reject(
+                    "FEATURE_UNAVAILABLE",
+                    "ML Kit GenAI is not installed in this build",
+                    e
+                )
+                return@launch
+            }
+
+            run {
                 try {
                     val status = summarizer.checkFeatureStatus().await()
                     if (!genAiStatusAllowsRun(status, "summarization", promise)) return@launch
@@ -681,13 +776,21 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                     closeQuietly { summarizer.close() }
                 }
             }
-        } catch (e: Throwable) {
-            promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI is not installed in this build", e)
         }
     }
 
     override fun rewriteText(text: String, style: String, promise: Promise) {
-        try {
+        genAiScope.launch {
+            val language = genAiLanguageFor(text, rewriterLanguages)
+            if (language == null) {
+                promise.reject(
+                    "UNSUPPORTED_LANGUAGE",
+                    "ML Kit rewriting supports English, Japanese, German, French, " +
+                        "Italian, Spanish and Korean."
+                )
+                return@launch
+            }
+
             val outputType = when (style) {
                 // The union is ELABORATE, EMOJIFY, SHORTEN, FRIENDLY, PROFESSIONAL,
                 // REPHRASE. There is no FORMAL or CASUAL.
@@ -697,12 +800,24 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                 "creative", "elaborate" -> RewriterOptions.OutputType.ELABORATE
                 else -> RewriterOptions.OutputType.REPHRASE
             }
-            val opts = RewriterOptions.builder(reactContext)
-                .setOutputType(outputType)
-                .setLanguage(RewriterOptions.Language.ENGLISH)
-                .build()
-            val rewriter: Rewriter = Rewriting.getClient(opts)
-            genAiScope.launch {
+
+            val rewriter: Rewriter = try {
+                Rewriting.getClient(
+                    RewriterOptions.builder(reactContext)
+                        .setOutputType(outputType)
+                        .setLanguage(language)
+                        .build()
+                )
+            } catch (e: Throwable) {
+                promise.reject(
+                    "FEATURE_UNAVAILABLE",
+                    "ML Kit GenAI is not installed in this build",
+                    e
+                )
+                return@launch
+            }
+
+            run {
                 try {
                     val status = rewriter.checkFeatureStatus().await()
                     if (!genAiStatusAllowsRun(status, "rewriting", promise)) return@launch
@@ -723,18 +838,37 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                     closeQuietly { rewriter.close() }
                 }
             }
-        } catch (e: Throwable) {
-            promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI is not installed in this build", e)
         }
     }
 
     override fun proofreadText(text: String, promise: Promise) {
-        try {
-            val opts = ProofreaderOptions.builder(reactContext)
-                .setLanguage(ProofreaderOptions.Language.ENGLISH)
-                .build()
-            val proofreader: Proofreader = Proofreading.getClient(opts)
-            genAiScope.launch {
+        genAiScope.launch {
+            val language = genAiLanguageFor(text, proofreaderLanguages)
+            if (language == null) {
+                promise.reject(
+                    "UNSUPPORTED_LANGUAGE",
+                    "ML Kit proofreading supports English, Japanese, German, French, " +
+                        "Italian, Spanish and Korean."
+                )
+                return@launch
+            }
+
+            val proofreader: Proofreader = try {
+                Proofreading.getClient(
+                    ProofreaderOptions.builder(reactContext)
+                        .setLanguage(language)
+                        .build()
+                )
+            } catch (e: Throwable) {
+                promise.reject(
+                    "FEATURE_UNAVAILABLE",
+                    "ML Kit GenAI is not installed in this build",
+                    e
+                )
+                return@launch
+            }
+
+            run {
                 try {
                     val status = proofreader.checkFeatureStatus().await()
                     if (!genAiStatusAllowsRun(status, "proofreading", promise)) return@launch
@@ -760,8 +894,6 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                     closeQuietly { proofreader.close() }
                 }
             }
-        } catch (e: Throwable) {
-            promise.reject("FEATURE_UNAVAILABLE", "ML Kit GenAI is not installed in this build", e)
         }
     }
 
