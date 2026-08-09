@@ -1,52 +1,60 @@
-# Mobile AI Toolkit — example
+# Example app
 
-An Expo app that shows what `react-native-ondevice-ai` can actually do **on
-your device**, which is the only question that matters for a package like this.
+A development build that answers one question: **what can the phone in your
+hand actually do?**
 
-Most on-device AI demos show generation working on the one phone the author
-owns. The interesting case is the other 95% of phones — no AICore, no Apple
-Intelligence — so this app leads with availability: every feature's state, the
-reason when it is unavailable, and whether that reason is permanent. Then it
-summarises an article and reports which route produced the result and whether
-it was degraded.
+It reads `availability` for every feature straight from ML Kit's
+`checkFeatureStatus()` and Apple's `SystemLanguageModel.availability`, then
+lets you run every method once and read what came back.
 
-It is also the first consumer of this package's own Expo config plugin, so if
-the plugin breaks, this app stops building. CI runs `expo prebuild` on every
-pull request for exactly that reason.
+## Run it on an Android device
 
-## Run it
+You need a device with USB debugging on, Java 17 and the Android SDK. Expo Go
+will not work — this package has native code, so it needs a development build.
 
-Needs a development build — the native module cannot exist in Expo Go. (It will
-not crash there: importing the package is safe, and calls reject with
-`MODULE_NOT_LINKED`.)
+```bash
+# from the repository root: build the library the example links to
+npm install
+npm run build
+
+cd example
+npm install
+npx expo run:android --device
+```
+
+`expo run:android` prebuilds the native project and installs it. The config
+plugin sets `minSdkVersion` 26 for you.
+
+## Run it on an iPhone
 
 ```bash
 cd example
 npm install
-npm run ios        # or: npm run android
+npx expo run:ios --device
 ```
 
-Those scripts run `expo run:*`, which prebuilds the native projects on first
-use. To regenerate them from scratch:
+## What to look at
 
-```bash
-npm run prebuild   # expo prebuild --clean
-```
+**"What this device can do"** — one row per feature with a state and, when
+unavailable, a reason. The reason is the interesting part: `hardware-ineligible`
+and `os-too-old` mean hide the feature forever, while `model-not-ready` and
+`user-disabled` can change without your app being updated. AICore updates its
+model through the system, not through your app, so this answer is a live one
+rather than a device list someone typed out once.
 
-`ios/` and `android/` are deliberately not committed — the config plugin
-generates them, which keeps ~30k lines of scaffolding out of the repository and
-means the plugin is exercised rather than trusted.
+**"Verify on this device"** — runs every public method and reports how each
+one settled: resolved, rejected with a typed code, or — the case worth
+reporting — failed outside the taxonomy.
 
-## What you should see
+A rejection is usually the correct answer. On a phone without AICore or Apple
+Intelligence, the generative methods **should** reject with
+`FEATURE_UNAVAILABLE` and a permanent reason. What would be a defect is a call
+that hangs, crashes, or comes back as an untyped error.
 
-On a device without a generative model, `summarize` falls back to the bundled
-extractive summariser on Android and rejects honestly on iOS. Either way the
-result carries its route and an `attempts` trace, so a fallback is never
-mistaken for a model.
+## If you have generative hardware
 
-The library is consumed through `file:..`, so edits to `../src` show up here
-after `npm run build` in the repository root.
-
----
-
-[react-native-ondevice-ai](https://github.com/anivar/react-native-ondevice-ai)
+A Pixel 9 or 10, a Galaxy S25, or an iPhone with Apple Intelligence on iOS 26
+can exercise paths that no CI runner can reach. The generative rows in the
+report from such a device are the most useful thing anyone can contribute to
+this project right now — long-press the report, share it, and open an issue
+with it.

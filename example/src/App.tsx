@@ -32,6 +32,7 @@ import {
   summarize,
 } from 'react-native-ondevice-ai';
 import { dark, light, stateColor, type Theme } from './theme';
+import { type CheckResult, formatReport, runVerification } from './verify';
 
 const ARTICLE = [
   'The city council approved the new transit plan on Tuesday evening.',
@@ -51,6 +52,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SummarizeResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [checks, setChecks] = useState<CheckResult[] | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -78,6 +81,18 @@ export default function App() {
       setBusy(false);
     }
   }, []);
+
+  const runChecks = useCallback(async () => {
+    setVerifying(true);
+    setChecks([]);
+    try {
+      await runVerification((done) => setChecks(done));
+    } finally {
+      setVerifying(false);
+    }
+  }, []);
+
+  const report = useMemo(() => (checks ? formatReport(checks) : ''), [checks]);
 
   return (
     <SafeAreaView style={s.screen}>
@@ -133,6 +148,64 @@ export default function App() {
             </View>
           ))}
         </View>
+
+        <Text style={s.h2}>Verify on this device</Text>
+        <Text style={s.note}>
+          Calls every method once and reports what came back. A rejection is not a failure — on a
+          device without a generative model, FEATURE_UNAVAILABLE is the right answer. What matters
+          is that every call settles, and that every failure arrives typed rather than as a crash.
+        </Text>
+
+        <TouchableOpacity style={s.button} onPress={runChecks} disabled={verifying}>
+          {verifying ? (
+            <ActivityIndicator color={theme.paper} />
+          ) : (
+            <Text style={s.buttonText}>Run all checks</Text>
+          )}
+        </TouchableOpacity>
+
+        {checks && checks.length > 0 && (
+          <>
+            <View style={s.card}>
+              {checks.map((c, i) => (
+                <View key={c.name} style={[s.row, i === checks.length - 1 && s.rowLast]}>
+                  <Text style={s.feature}>{c.name}</Text>
+                  <View style={s.rowRight}>
+                    <Text
+                      style={[
+                        s.state,
+                        {
+                          color:
+                            c.outcome === 'resolved'
+                              ? stateColor(theme, 'available')
+                              : c.outcome === 'rejected'
+                                ? stateColor(theme, 'downloadable')
+                                : stateColor(theme, 'unavailable'),
+                        },
+                      ]}
+                    >
+                      {c.outcome === 'threw' ? 'untyped failure' : c.outcome}
+                    </Text>
+                    <Text style={s.reason}>
+                      {c.code ? `${c.code}${c.reason ? ` / ${c.reason}` : ''} · ` : ''}
+                      {c.ms}ms
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            <Text style={s.note}>
+              Long-press to select and share this report — it is what turns "it built" into evidence
+              about a real device.
+            </Text>
+            <View style={s.card}>
+              <Text selectable style={s.report}>
+                {report}
+              </Text>
+            </View>
+          </>
+        )}
 
         <Text style={s.h2}>Summarize</Text>
         <Text style={s.note}>
@@ -221,6 +294,7 @@ function makeStyles(t: Theme) {
     rowLast: { borderBottomWidth: 0 },
     rowRight: { alignItems: 'flex-end', flexShrink: 1, paddingLeft: 12 },
     feature: { fontSize: 13, fontFamily: 'Menlo', color: t.ink },
+    report: { fontSize: 11, fontFamily: 'Menlo', color: t.ink, lineHeight: 16 },
     state: { fontSize: 13, fontWeight: '600' },
     reason: { fontSize: 11, color: t.inkFaint },
     permanent: { fontSize: 10, color: t.seal },

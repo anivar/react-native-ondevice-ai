@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Mobile AI Toolkit Example",
+    "name": "On-device AI Example",
     "slug": "react-native-ondevice-ai-example",
     "version": "1.0.0",
     "orientation": "portrait",
