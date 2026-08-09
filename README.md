@@ -5,7 +5,7 @@
 Nothing leaves the device. There is no cloud tier and no `fetch`, and CI fails the build if a networking symbol appears in the native sources at all.
 
 Needs iOS 17+, Android API 26+ and React Native 0.86+ on the New Architecture.
-No runtime dependencies. MIT.
+No JS runtime dependencies. MIT.
 
 ## Install
 
@@ -28,7 +28,8 @@ A development build, not Expo Go.
 ```ts
 import { getDeviceCapabilities, analyzeText, summarize } from 'react-native-ondevice-ai';
 
-// Works on every supported device — no model download, no setup.
+// Language ID and entities on every supported device, no model download.
+// Sentiment is iOS only — NaturalLanguage has it, ML Kit does not.
 const { language, sentiment } = await analyzeText('I really like this app', {
   includeSentiment: true,
 });
@@ -49,10 +50,10 @@ Most phones cannot run a generative model. Gemini Nano needs AICore and Apple Fo
 ```ts
 availability.summarize
 // { state: 'downloadable', requiresNetwork: true,
-//   detail: 'AICore can download the generative model for this device.' }
+//   detail: 'AICore can download the model for this feature.' }
 ```
 
-`state` is `available`, `downloadable`, `downloading` or `unavailable`. When it is `unavailable` it carries a `reason` — and the distinction that matters is permanence: `os-too-old`, `hardware-ineligible` and `no-platform-api` mean hide the button forever; `user-disabled` and `model-not-ready` may change without your app being updated.
+`state` is `available`, `downloadable`, `downloading` or `unavailable`. When it is `unavailable` it carries a `reason` — and the distinction that matters is permanence: `os-too-old`, `hardware-ineligible` and `no-platform-api` mean hide the button forever; `user-disabled` and `model-not-ready` may change without your app being updated. Android often reports `unknown` instead of `hardware-ineligible` — AICore's own status cannot tell "never will" from "still fetching its configuration", so this package does not claim more certainty than the platform gives it. Treat `unknown` as "not now", not "never".
 
 This comes from ML Kit's `checkFeatureStatus()` and Apple's `SystemLanguageModel.availability` — signals both platforms publish and most wrappers throw away in favour of a boolean.
 
@@ -62,16 +63,18 @@ This comes from ML Kit's `checkFeatureStatus()` and Apple's `SystemLanguageModel
 
 | | iOS | Android |
 |---|---|---|
-| Text: language ID, entities, sentiment | ✅ | ✅ |
+| Text: language ID, entities | ✅ | ✅ |
+| Sentiment | ✅ | ❌ |
 | Vision: OCR, barcodes, labels, faces, segmentation | ✅ | ✅ |
 | Embeddings | ✅ | ❌ |
 | Translate, smart replies, image description | ❌ | ✅ |
 | File transcription | ✅ | ❌ |
-| Generative: summarize, rewrite, generate, chat | iOS 26 + Apple Intelligence | AICore devices |
+| Proofread | ✅ (UITextChecker, always) | AICore, generative |
+| Summarize, rewrite, generate, chat | iOS 26 + Apple Intelligence | AICore devices |
 
 The two platforms genuinely differ, and this package does not pretend otherwise: a call that a platform cannot do rejects with a typed `AIError` naming the reason, never a polyfill or a placeholder string. Full table: [docs/capabilities.md](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/capabilities.md).
 
-For devices with no generative model, `summarize()` falls back to a bundled extractive summariser that selects sentences and never composes new text, so it cannot invent anything. Results carry `degraded: true` and the route that produced them.
+On Android, where most devices have no generative model, `summarize()` falls back to a bundled extractive summariser that selects sentences and never composes new text, so it cannot invent anything — results carry `degraded: true` and the route that produced them. iOS defaults to an honest rejection instead of that fallback, since Apple ships a real summariser on eligible hardware and a silently worse result on everything else is not a favour; opt in with `configure({ ios: { tiers: ['on-device', 'local-deterministic'] } })` if you want it anyway.
 
 ## Docs
 
@@ -82,12 +85,12 @@ For devices with no generative model, `summarize()` falls back to a bundled extr
 
 ## Status
 
-Every line of Kotlin, Swift and ObjC++ is compiled by CI on each pull request, inside a generated host app, and CI asserts this library was actually linked and that none of its build tasks failed. The native sources are checked for networking symbols, the Android manifest for permissions beyond an allowlist, and the podspec for agreement with the manifest it ships in.
+CI compiles every line of Kotlin, Swift and ObjC++ on each pull request, inside a generated host app, and asserts this library was actually linked and that none of its build tasks failed. It runs nothing — no job executes a native path on a device or emulator. The native sources are also checked for networking symbols, the Android manifest for permissions beyond an allowlist, and the podspec for agreement with the manifest it ships in.
 
-The generative routes bind to Apple Foundation Models and ML Kit GenAI, which need an Apple Intelligence iPhone and an AICore Android respectively — hardware no CI runner has. The example app has a screen that runs every method and produces a shareable report; if you own one of those devices, [that report is the most useful thing anyone can send](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/contributing-hardware.md).
+The generative routes additionally need hardware no CI runner has at all: an Apple Intelligence iPhone for Foundation Models, an AICore Android for ML Kit GenAI. The example app has a screen that exercises the public API and produces a shareable report; if you own one of those devices, [that report is the most useful thing anyone can send](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/contributing-hardware.md).
 
 ## About
 
-This package is inference and routing code only — no model weights, no training data, nothing bundled that you have not already installed with the OS.
+This repository ships no model weights and no training data. On iOS everything comes from system frameworks that were already on the phone. On Android, the ML Kit base APIs are bundled dependencies — they add their own model assets to your APK, which is a real cost this package does not hide — and entity extraction and translation additionally download a language pack on first use.
 
 MIT © [Anivar Aravind](https://github.com/anivar)

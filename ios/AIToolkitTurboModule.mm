@@ -436,7 +436,9 @@ RCT_EXPORT_METHOD(translateText:(NSString *)text
                  reject:(RCTPromiseRejectBlock)reject)
 {
     reject(@"UNSUPPORTED_PLATFORM",
-           @"iOS Translation framework requires SwiftUI host integration; tracked for v2.2. On Android use ML Kit Translator.",
+           @"Apple's TranslationSession is only obtainable from a SwiftUI translationTask "
+           @"modifier, which needs a hosted UIHostingController this package does not carry. "
+           @"Use ML Kit Translator on Android.",
            nil);
 }
 

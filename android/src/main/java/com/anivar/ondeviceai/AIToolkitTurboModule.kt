@@ -528,10 +528,26 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
 
     override fun extractEntities(text: String, promise: Promise) {
         runEntityExtraction(text) { array, err ->
-            if (err != null) promise.reject("ENTITY_EXTRACTION_ERROR", err.message, err)
-            else promise.resolve(array)
+            when {
+                err is EntityModelNotDownloaded -> promise.reject("MODEL_NOT_DOWNLOADED", err.message)
+                err != null -> promise.reject("ENTITY_EXTRACTION_ERROR", err.message, err)
+                else -> promise.resolve(array)
+            }
         }
     }
+
+    /**
+     * Distinguishes "private mode refused to download this" from every other
+     * entity-extraction failure, so extractEntities() can reject the same
+     * MODEL_NOT_DOWNLOADED code that translateText() already does for the
+     * identical situation — rather than the generic INFERENCE_FAILED an
+     * IOException produced here before, which broke private mode's own
+     * contract silently.
+     */
+    private class EntityModelNotDownloaded : Exception(
+        "Private mode is on and the entity-extraction model is not on this " +
+            "device. Downloading it would require a network request."
+    )
 
     private fun runEntityExtraction(text: String, callback: (WritableArray, Throwable?) -> Unit) {
         val extractor = EntityExtraction.getClient(
@@ -558,10 +574,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
         val work = if (privateMode) {
             extractor.isModelDownloaded.continueWithTask { downloaded ->
                 if (downloaded.result != true) {
-                    throw java.io.IOException(
-                        "Private mode is on and the entity-extraction model is not on " +
-                            "this device. Downloading it would require a network request."
-                    )
+                    throw EntityModelNotDownloaded()
                 }
                 extractor.annotate(EntityExtractionParams.Builder(text).build())
             }

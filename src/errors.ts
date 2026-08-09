@@ -108,6 +108,12 @@ export function isTransient(e: unknown): boolean {
     (e.code === ErrorCodes.MODEL_NOT_DOWNLOADED ||
       e.code === ErrorCodes.MODEL_DOWNLOAD_TIMEOUT ||
       e.code === ErrorCodes.MODEL_DOWNLOAD_FAILED ||
-      e.code === ErrorCodes.TIMEOUT)
+      e.code === ErrorCodes.TIMEOUT ||
+      // AICore is mid-download, or the per-app battery quota is waiting to
+      // refill — both raised as FEATURE_UNAVAILABLE with reason
+      // model-not-ready, which is exactly the "ask again shortly" case this
+      // predicate exists for. Missing this meant a retry button built on
+      // isTransient hid itself during the one window it should show.
+      (e.code === ErrorCodes.FEATURE_UNAVAILABLE && e.reason === 'model-not-ready'))
   );
 }

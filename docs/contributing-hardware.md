@@ -3,12 +3,21 @@
 ## Contributors needed (real-device verification)
 
 One thing blocks a fully verified release, and it needs hardware rather than
-effort. **If you own any of these, ten minutes closes it:**
+effort. **If you own any of these on iOS 26 / iPadOS 26 or later, ten minutes
+closes it:**
 
 - iPhone 15 Pro / Pro Max, any iPhone 16 or 17
-- an M-series iPad or Apple-silicon Mac on macOS 26+
+- an M-series iPad
 
 with Apple Intelligence enabled in **Settings → Apple Intelligence & Siri**.
+This package has no macOS build — the podspec targets iOS only, and the
+native sources depend on UIKit throughout — so an Apple-silicon Mac cannot run
+this without going through iPadOS app compatibility, which is untested here.
+
+Apple Intelligence itself shipped in iOS 18.1; the `FoundationModels` framework
+this package binds is iOS 26+, which is the floor that matters here. On an
+eligible device below iOS 26, `explainCall('generate')` returns reason
+`os-too-old` — that means the OS version, not a broken bridge.
 
 ```ts
 import { getDeviceCapabilities, explainCall, generateText } from 'react-native-ondevice-ai';

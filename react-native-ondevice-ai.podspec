@@ -18,7 +18,10 @@ Pod::Spec.new do |s|
   # makes every non-generative feature here unconditional; only Foundation
   # Models (iOS 26+) is still gated.
   s.platforms    = { :ios => "17.0" }
-  s.source       = { :git => "https://github.com/anivar/react-native-ondevice-ai.git", :tag => "#{s.version}" }
+  # Releases are tagged v0.1.0, not 0.1.0 — release.yml fires on "v*.*.*" and
+  # every existing tag in this repo carries the v. A bare version here asks
+  # git for a tag that does not exist.
+  s.source       = { :git => "https://github.com/anivar/react-native-ondevice-ai.git", :tag => "v#{s.version}" }
 
   s.source_files = [
     "ios/**/*.{h,m,mm,swift}",

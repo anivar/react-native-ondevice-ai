@@ -109,6 +109,7 @@ jest.mock('../specs/NativeAIToolkit', () => ({
 }));
 
 import {
+  AIError,
   analyzeImage,
   analyzeText,
   chat,
@@ -230,6 +231,42 @@ describe('react-native-ondevice-ai', () => {
   test('unavailable is permanent, so nothing here is worth retrying', async () => {
     const err = await summarizeText('x').catch((e) => e);
     expect(isTransient(err)).toBe(false);
+  });
+
+  test('a mid-download or quota-exhausted feature is worth retrying', () => {
+    // Both raised as FEATURE_UNAVAILABLE with reason model-not-ready — exactly
+    // the "ask again shortly" case, and the one isTransient used not to cover.
+    const midDownload = new AIError({
+      code: ErrorCodes.FEATURE_UNAVAILABLE,
+      reason: 'model-not-ready',
+      message: 'AICore is downloading the model for this feature.',
+      platformCode: 'GENAI_MODEL_DOWNLOADING',
+      platform: 'android',
+      feature: 'summarize',
+    });
+    expect(isTransient(midDownload)).toBe(true);
+
+    const quotaExceeded = new AIError({
+      code: ErrorCodes.FEATURE_UNAVAILABLE,
+      reason: 'model-not-ready',
+      message: 'The per-app battery quota is exhausted.',
+      platformCode: 'GENAI_QUOTA_EXCEEDED',
+      platform: 'android',
+      feature: 'summarize',
+    });
+    expect(isTransient(quotaExceeded)).toBe(true);
+  });
+
+  test('unavailable for a reason other than model-not-ready is not transient', () => {
+    const hardwareIneligible = new AIError({
+      code: ErrorCodes.FEATURE_UNAVAILABLE,
+      reason: 'hardware-ineligible',
+      message: 'This device does not support ML Kit GenAI.',
+      platformCode: 'GENAI_AICORE_INCOMPATIBLE',
+      platform: 'android',
+      feature: 'summarize',
+    });
+    expect(isTransient(hardwareIneligible)).toBe(false);
   });
 
   test('the feature name survives into the error', async () => {

@@ -4,7 +4,7 @@ What each method maps to, and how to ask a device what it can do.
 
 ## Capability matrix
 
-Every method below maps to a real platform call. ✅ = on-device. 🧪 = compiled against the real SDK but never observed running on eligible hardware. ⚠️ = on-device when supported by OEM/locale. ❌ = not implemented on that platform; the call rejects with `UNSUPPORTED_PLATFORM`.
+Every method below maps to a real platform call. ✅ = on-device. 🧪 = compiled against the real SDK but never observed running on eligible hardware. ❌ = not implemented on that platform; the call rejects with `code: 'FEATURE_UNAVAILABLE'` and `reason: 'no-platform-api'`. `platformCode` carries the platform's own string — `UNSUPPORTED_PLATFORM`, or `FILE_TRANSCRIPTION_UNSUPPORTED` for Android transcription.
 
 | Method | iOS | Android |
 |---|---|---|
@@ -13,18 +13,18 @@ Every method below maps to a real platform call. ✅ = on-device. 🧪 = compile
 | `extractEntities(text)` | ✅ `NLTagSchemeNameType` | ✅ ML Kit `EntityExtraction` |
 | `identifyLanguage(text)` | ✅ `NLLanguageRecognizer` | ✅ ML Kit `LanguageIdentification` |
 | `embedText(text)` | ✅ `NLContextualEmbedding` (iOS 17+) | ❌ |
-| `analyzeImage(b64, opts)` | ✅ Vision OCR + face rects + iOS 17 foreground mask | ✅ ML Kit text + objects + faces |
+| `analyzeImage(b64, opts)` | ✅ Vision OCR + face rects — `objects` is always empty (Vision ships no general object detector) | ✅ ML Kit text + objects + faces |
 | `scanBarcodes(b64)` | ✅ `VNDetectBarcodesRequest` | ✅ ML Kit `BarcodeScanning` |
 | `labelImage(b64)` | ✅ `VNClassifyImageRequest` | ✅ ML Kit `ImageLabeling` |
-| `describeImage(b64)` | ❌ | ✅ ML Kit GenAI `ImageDescription` *(Beta, AICore)* |
+| `describeImage(b64)` | ❌ | 🧪 ML Kit GenAI `ImageDescription` *(Beta, AICore — unverified on hardware)* |
 | `segmentPerson(b64)` | ✅ `VNGeneratePersonSegmentationRequest` (iOS 15+) | ✅ ML Kit `SelfieSegmentation` |
-| `proofreadText(text)` | ✅ `UITextChecker` *(spelling only)* | ✅ ML Kit GenAI `Proofreader` *(Beta, AICore)* |
-| `summarizeText(text, fmt)` | 🧪 Foundation Models *(iOS 26+, Apple Intelligence — unverified on hardware)* | ✅ ML Kit GenAI `Summarizer` *(Beta, AICore)* |
-| `rewriteText(text, style)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Rewriter` *(Beta, AICore)* |
-| `generateText(prompt, opts)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Prompt` API *(Beta, Gemini Nano via AICore)* |
-| `chat(messages, opts)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Prompt` API (history flattened to single-shot prompt) |
+| `proofreadText(text)` | ✅ `UITextChecker` *(spelling only, always on)* | 🧪 ML Kit GenAI `Proofreader` *(Beta, AICore — unverified on hardware)* |
+| `summarizeText(text, fmt)` | 🧪 Foundation Models *(iOS 26+, Apple Intelligence — unverified on hardware)* | 🧪 ML Kit GenAI `Summarizer` *(Beta, AICore — unverified on hardware)* |
+| `rewriteText(text, style)` | 🧪 Foundation Models *(iOS 26+, unverified)* | 🧪 ML Kit GenAI `Rewriter` *(Beta, AICore — unverified on hardware)* |
+| `generateText(prompt, opts)` | 🧪 Foundation Models *(iOS 26+, unverified)* | 🧪 ML Kit GenAI `Prompt` API *(Beta, Gemini Nano via AICore — unverified on hardware; Galaxy S25 supports the four rows above but not this one)* |
+| `chat(messages, opts)` | 🧪 Foundation Models *(iOS 26+, unverified)* | 🧪 ML Kit GenAI `Prompt` API *(unverified; history flattened to single-shot prompt, bounded to the model's context window)* |
 | `smartReplies(messages)` | ❌ — no public iOS equivalent | ✅ ML Kit `SmartReply` (GA) |
-| `translateText(text, src, tgt)` | ❌ — `TranslationSession` needs a SwiftUI host; see below | ✅ ML Kit `Translator` (GA, downloads language pack on first use) |
+| `translateText(text, src, tgt)` | ❌ — `TranslationSession` needs a SwiftUI host ([why](./guide.md#what-this-package-does-not-do)) | ✅ ML Kit `Translator` (GA, downloads language pack on first use) |
 | `transcribeAudioFile(path, opts)` | ✅ `SFSpeechRecognizer` with `requiresOnDeviceRecognition = true` | ❌ — rejects `FILE_TRANSCRIPTION_UNSUPPORTED`. Android's `SpeechRecognizer` is microphone-only on stock platforms |
 
 ### Knowing what will actually work
@@ -35,7 +35,7 @@ Every method below maps to a real platform call. ✅ = on-device. 🧪 = compile
 const { availability } = await getDeviceCapabilities();
 availability.summarize
 // { state: 'downloadable', requiresNetwork: true,
-//   detail: 'AICore can download the generative model for this device.' }
+//   detail: 'AICore can download the model for this feature.' }
 ```
 
 `state` is one of `available`, `downloadable`, `downloading` or `unavailable`. The
@@ -45,13 +45,14 @@ this device for good, while `user-disabled` and `model-not-ready` can change
 without your app being updated.
 
 On Android this comes from ML Kit's `checkFeatureStatus()`, and on iOS from
-`SystemLanguageModel.availability` — the signals both platforms already had and
-this package used to throw away.
+`SystemLanguageModel.availability` — signals both platforms publish and most
+wrappers flatten into a boolean.
 
 `explainCall(feature)` answers the same question as a sentence, and with no
 argument returns the plan for all 16 features. It runs no inference and touches
-no network. Since the two platforms deliberately differ, it is the only way to
-see the other platform's answer without owning the hardware.
+no network. It reports the device it is running on — there is no static
+cross-platform table, so run it on both platforms if you need to see whether a
+feature is symmetric.
 
 ### Working with or without a network
 
@@ -60,16 +61,17 @@ Nothing in this package sends anything anywhere. There is no cloud tier, no
 sources at all.
 
 "Offline" still has two meanings worth separating. Inference is always local on
-both platforms. But two Android features — translation and entity extraction —
-download a model on first use, and that download needs a network. After it, they
-work offline forever. `availability` marks those with `requiresNetwork: true`
-while they are still `downloadable`.
+both platforms. But several Android features download a model on first use,
+and that download needs a network: translation and entity extraction, plus
+every ML Kit GenAI feature, whose model AICore fetches the first time you call
+it. After that they work offline forever. `availability` marks those with
+`requiresNetwork: true` while they are still `downloadable`.
 
 `enablePrivateMode(true)` makes that explicit: a model already on the device
 keeps working, and one that is missing rejects `MODEL_NOT_DOWNLOADED` rather
 than quietly fetching it. On iOS there is no download path at all, so private
-mode is a no-op there and the README says so rather than implying a control that
-does not exist.
+mode is a no-op there, which [the guide](./guide.md#private-mode) says outright
+rather than implying a control that does not exist.
 
 For devices with no generative model — most non-Pixel Android — `summarize()`
 can fall back to a bundled extractive summariser:
@@ -84,16 +86,16 @@ state anything the source did not. It ships no weights and adds no bytes to
 your app. Results always carry `degraded: true` and the full `attempts` trace,
 so you can tell a real model's output from a fallback's, and see why.
 
-`summarizeText()` is unchanged and never falls back — it is the platform model
-or a rejection, permanently. Fallback behaviour requires calling a differently
-named function, so no upgrade can introduce it on your behalf. The fallback is
-on by default on Android only; iOS gets an honest rejection instead, because
-Apple ships a real summariser on eligible hardware and a silently worse result
-is not a favour. Change it with `configure({ android: { tiers: ['on-device'] } })`.
+`summarizeText()` never falls back — it is the platform model or a rejection,
+permanently. Fallback behaviour requires calling a differently named function,
+so no upgrade can introduce it on your behalf. The fallback is on by default on
+Android only; iOS gets an honest rejection instead, because Apple ships a real
+summariser on eligible hardware and a silently worse result is not a favour.
+Change it with `configure({ android: { tiers: ['on-device'] } })`.
 
-There is no boolean `features` map. It existed, it was wrong in both directions,
-and a flag that reads `true` for a model still downloading cannot answer "will
-this call succeed" — so it was removed rather than deprecated.
+There is no boolean `features` map. A flag that reads `true` for a model still
+downloading cannot answer "will this call succeed", so this package does not
+ship one.
 
 Every rejection is an `AIError` with a `code` you can switch on — `FEATURE_UNAVAILABLE`, `MODEL_NOT_DOWNLOADED`, `MODEL_DOWNLOAD_TIMEOUT`, `INFERENCE_FAILED`, `MODULE_NOT_LINKED` and a few more — plus `platformCode`, the platform's own more specific string. `isTransient(err)` is true when the feature could work later on this device, which is the distinction a retry button needs.
 

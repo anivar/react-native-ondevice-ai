@@ -19,6 +19,7 @@ import {
   analyzeText,
   chat,
   describeImage,
+  embedText,
   extractEntities,
   generateText,
   getDeviceCapabilities,
@@ -31,6 +32,8 @@ import {
   segmentPerson,
   smartReplies,
   summarize,
+  summarizeText,
+  transcribeAudioFile,
   translateText,
 } from 'react-native-ondevice-ai';
 
@@ -107,6 +110,15 @@ const CHECKS: Check[] = [
       ]),
   },
 
+  // iOS-only. On Android these have no platform API at all and reject
+  // no-platform-api, which is the correct answer, not a skipped check.
+  { name: 'embedText', group: 'Text', run: () => embedText('a sentence to embed') },
+  {
+    name: 'transcribeAudioFile',
+    group: 'Text',
+    run: () => transcribeAudioFile('/tmp/does-not-exist.m4a'),
+  },
+
   { name: 'analyzeImage', group: 'Vision', run: () => analyzeImage(TINY_PNG) },
   { name: 'scanBarcodes', group: 'Vision', run: () => scanBarcodes(TINY_PNG) },
   { name: 'labelImage', group: 'Vision', run: () => labelImage(TINY_PNG) },
@@ -116,6 +128,11 @@ const CHECKS: Check[] = [
   // one of these should reject with FEATURE_UNAVAILABLE and a permanent reason,
   // which is a pass for this harness.
   { name: 'summarize', group: 'Generative', run: () => summarize(ARTICLE) },
+  {
+    name: 'summarizeText',
+    group: 'Generative',
+    run: () => summarizeText(ARTICLE, 'bullets'),
+  },
   {
     name: 'rewriteText',
     group: 'Generative',
@@ -134,6 +151,9 @@ const CHECKS: Check[] = [
   },
   { name: 'describeImage', group: 'Generative', run: () => describeImage(TINY_PNG) },
 ];
+
+/** The real count, not a number someone has to remember to update. */
+export const TOTAL_CHECKS = CHECKS.length;
 
 function preview(value: unknown, describe?: Check['describe']): string {
   if (describe) {

@@ -32,7 +32,14 @@ import {
   summarize,
 } from 'react-native-ondevice-ai';
 import { dark, light, stateColor, type Theme } from './theme';
-import { type CheckGroup, type CheckResult, formatReport, runVerification, tally } from './verify';
+import {
+  type CheckGroup,
+  type CheckResult,
+  formatReport,
+  runVerification,
+  TOTAL_CHECKS,
+  tally,
+} from './verify';
 
 const ARTICLE = [
   'The city council approved the new transit plan on Tuesday evening.',
@@ -43,7 +50,6 @@ const ARTICLE = [
 ].join(' ');
 
 const GROUPS: CheckGroup[] = ['Text', 'Vision', 'Generative'];
-const TOTAL_CHECKS = 16;
 
 /** A returned call reads as success; a typed refusal is neutral; untyped is the alarm. */
 function pillStyle(t: Theme, c: CheckResult) {

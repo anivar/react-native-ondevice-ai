@@ -24,12 +24,14 @@ import {
 // 1. Probe once at startup, gate UI on the feature map.
 const caps = await getDeviceCapabilities();
 
-// 2. Universal text + image — works on every iOS/Android device.
+// 2. Text + image. Language ID and confidence are universal; sentiment is
+// iOS-only, and entities on Android need a one-time model download.
 const analysis = await analyzeText('I really like this app', {
   includeSentiment: true,
   includeEntities: true,
 });
-// → { language: 'en', sentiment: 0.6, entities: [...], confidence: 0.9 }
+// → iOS:     { language: 'en', sentiment: 0.6, entities: [...], confidence: 0.9 }
+// → Android: { language: 'en', entities: [...], confidence: 0.9 } — no sentiment
 
 const img = await analyzeImage(base64png, { extractText: true, detectFaces: true });
 const codes = await scanBarcodes(base64png);
@@ -56,7 +58,8 @@ try {
     { text: 'Want to grab lunch?', fromUser: false, timestampMs: Date.now() },
   ]);
 } catch (e) {
-  // iOS: { code: 'UNSUPPORTED_PLATFORM' }
+  // iOS: { code: 'FEATURE_UNAVAILABLE', reason: 'no-platform-api',
+  //        platformCode: 'UNSUPPORTED_PLATFORM' }
 }
 
 // 5. On-device transcription.
@@ -70,10 +73,12 @@ import { enablePrivateMode, isPrivateModeEnabled } from 'react-native-ondevice-a
 enablePrivateMode(true);
 ```
 
-On Android this is enforced natively at the only two places in the module that
-touch the network — the translation and entity-extraction model downloads. With
-it on, a model already on the device keeps working offline and a missing one
-rejects `MODEL_NOT_DOWNLOADED` instead of being fetched.
+On Android this is enforced at every point in the module that would fetch a
+model — the translation and entity-extraction downloads, and the AICore
+feature download behind `summarizeText`, `rewriteText`, `proofreadText` and
+`describeImage`. With it on, a model already on the device keeps working
+offline and a missing one rejects `MODEL_NOT_DOWNLOADED` instead of being
+fetched.
 
 On iOS it is a no-op, and this document would rather say so than imply a control
 that does not exist: there is no download path on that platform, and speech
@@ -81,21 +86,13 @@ recognition already refuses to fall back to Apple's servers for every caller.
 
 ## Device-class gotchas
 
-- **iOS Foundation Models** (`summarizeText`, `rewriteText`, `generateText`, `chat` on iOS) require iOS 26+ on Apple-Intelligence-eligible hardware (iPhone 15 Pro / Pro Max, every iPhone 16 / 17, M-series iPad / Mac) **and** Apple Intelligence enabled in Settings. On any other configuration these methods reject `FEATURE_UNAVAILABLE` with a precise reason from `SystemLanguageModel.availability`. **Compiled against the real SDK, but never observed running on eligible hardware — see the note at the top.**
-### Two AICore constraints that surprise people
+Neither generative path has run on real hardware yet — CI compiles both against
+their real SDKs inside a generated host app and nothing more. That is the gap
+the [example app's verification screen](../example/README.md) exists to close;
+a report from either kind of device is worth more than most code changes right
+now.
 
-**Inference only runs while your app is the foreground activity.** Not a
-foreground service — the actual visible activity. A generative call from a
-background task rejects with `FEATURE_UNAVAILABLE` and reason `user-disabled`,
-carrying `GENAI_BACKGROUND_BLOCKED` as the platform code. Schedule the work for
-when the user is looking at your app, rather than retrying in the background
-where it can never succeed.
-
-**There is a per-app battery quota.** Spend it and calls reject until the
-system refills it — `GENAI_QUOTA_EXCEEDED`, reason `model-not-ready`. Treat
-generative calls as a metered resource and do not loop over a list of items
-without a user asking for each.
-
+- **iOS Foundation Models** (`summarizeText`, `rewriteText`, `generateText`, `chat` on iOS) require iOS 26+ on Apple-Intelligence-eligible hardware (iPhone 15 Pro / Pro Max, every iPhone 16 / 17, M-series iPad / Mac) **and** Apple Intelligence enabled in Settings. On any other configuration these methods reject `FEATURE_UNAVAILABLE` with a precise reason from `SystemLanguageModel.availability`.
 - **ML Kit GenAI** on Android needs AICore, which serves **Gemini Nano**. Two device sets, not one, and this catches people out:
   - `summarizeText`, `rewriteText`, `proofreadText`, `describeImage` — the feature APIs, the wider set.
   - `generateText`, `chat` — the Prompt API, a strict subset. **The Galaxy S25, S25+ and S25 Ultra support the feature APIs but not the Prompt API**, so `summarize` works there and `generate` does not.
@@ -103,6 +100,17 @@ without a user asking for each.
   Both sets require a locked bootloader. Do not hardcode either list: AICore updates its model and its configuration through the system, without your app being updated, so a device's answer changes over time. Ask at runtime — `caps.availability.<method>.state`, or `explainCall('<method>')` — and treat the published device lists as illustration only.
 
   Note also that Gemma is **not** what AICore runs. Gemma is a separate, self-hosted model family you would load yourself through MediaPipe or LiteRT, with multi-gigabyte weights this package does not ship.
+
+  Two AICore constraints surprise people. **Inference only runs while your app
+  is the foreground activity** — not a foreground service, the actual visible
+  activity. A generative call from a background task rejects with
+  `FEATURE_UNAVAILABLE` and reason `user-disabled`, carrying
+  `GENAI_BACKGROUND_BLOCKED` as the platform code; schedule the work for when
+  the user is looking at your app, since retrying in the background can never
+  succeed. **There is also a per-app battery quota.** Spend it and calls
+  reject until the system refills it — `GENAI_QUOTA_EXCEEDED`, reason
+  `model-not-ready`. Treat generative calls as a metered resource rather than
+  looping them over a list without a user asking for each.
 - **iOS on-device speech** (`SFSpeechRecognizer.supportsOnDeviceRecognition`) returns true on most modern devices but can be false for locales whose speech model isn't installed.
 - **iOS proofread** uses `UITextChecker` and is spelling-only; the Apple Intelligence Writing Tools rewrite UI has no programmatic invocation API.
 - **iOS embeddings** require iOS 17+ and a model loaded for the script of the input (Latin / CJK / Cyrillic / etc.); unsupported scripts reject with `FEATURE_UNAVAILABLE`.
