@@ -16,6 +16,7 @@ import com.facebook.react.module.annotations.ReactModule
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.common.GenAiException
 import com.google.mlkit.genai.imagedescription.ImageDescriber
 import com.google.mlkit.genai.imagedescription.ImageDescriberOptions
 import com.google.mlkit.genai.imagedescription.ImageDescription
@@ -216,6 +217,43 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
      * value carries the distinction that matters — AVAILABLE, DOWNLOADABLE or
      * DOWNLOADING.
      */
+    /**
+     * AICore says *why* it failed, and the reason is usually actionable.
+     *
+     * GenAiException carries an error code covering cases a caller can do
+     * something about — the app is in the background, the battery quota is
+     * spent, the disk is full, the system needs an update — and collapsing all
+     * of them into one inference error throws away the only signal that tells a
+     * user what to do next. A package whose thesis is honest failure reasons
+     * should not discard the field that carries them.
+     *
+     * Returns null when the throwable is not a GenAiException, so the caller
+     * keeps its own code.
+     */
+    private fun genAiRejectCode(e: Throwable): String? {
+        val genAi = generateSequence(e) { it.cause }
+            .filterIsInstance<GenAiException>()
+            .firstOrNull()
+            ?: return null
+
+        return when (genAi.errorCode) {
+            // The app must be the foreground activity. A foreground service is
+            // not enough, which is the part that surprises people.
+            GenAiException.ErrorCode.BACKGROUND_USE_BLOCKED -> "GENAI_BACKGROUND_BLOCKED"
+            GenAiException.ErrorCode.PER_APP_BATTERY_USE_QUOTA_EXCEEDED -> "GENAI_QUOTA_EXCEEDED"
+            GenAiException.ErrorCode.BUSY -> "GENAI_BUSY"
+            GenAiException.ErrorCode.NOT_ENOUGH_DISK_SPACE -> "GENAI_NO_DISK_SPACE"
+            GenAiException.ErrorCode.NEEDS_SYSTEM_UPDATE -> "GENAI_NEEDS_SYSTEM_UPDATE"
+            GenAiException.ErrorCode.AICORE_INCOMPATIBLE -> "GENAI_AICORE_INCOMPATIBLE"
+            GenAiException.ErrorCode.NOT_AVAILABLE -> "GENAI_UNAVAILABLE"
+            GenAiException.ErrorCode.CANCELLED -> "GENAI_CANCELLED"
+            GenAiException.ErrorCode.REQUEST_TOO_LARGE -> "GENAI_REQUEST_TOO_LARGE"
+            GenAiException.ErrorCode.REQUEST_TOO_SMALL -> "GENAI_REQUEST_TOO_SMALL"
+            GenAiException.ErrorCode.INVALID_INPUT_IMAGE -> "INVALID_IMAGE"
+            else -> null
+        }
+    }
+
     /** The generative features, and the AICore client that actually answers for each. */
     private enum class GenAiFeature(val key: String) {
         SUMMARIZE("summarize"),
@@ -638,7 +676,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                     summarizer.runInference(request) { token -> sb.append(token) }.await()
                     promise.resolve(sb.toString())
                 } catch (e: Throwable) {
-                    promise.reject("SUMMARIZE_INFERENCE_ERROR", e.message, e)
+                    promise.reject(genAiRejectCode(e) ?: "SUMMARIZE_INFERENCE_ERROR", e.message, e)
                 } finally {
                     closeQuietly { summarizer.close() }
                 }
@@ -680,7 +718,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                     val result = rewriter.runInference(request).await()
                     promise.resolve(result.results.firstOrNull()?.text ?: text)
                 } catch (e: Throwable) {
-                    promise.reject("REWRITE_INFERENCE_ERROR", e.message, e)
+                    promise.reject(genAiRejectCode(e) ?: "REWRITE_INFERENCE_ERROR", e.message, e)
                 } finally {
                     closeQuietly { rewriter.close() }
                 }
@@ -717,7 +755,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                         }
                     )
                 } catch (e: Throwable) {
-                    promise.reject("PROOFREAD_INFERENCE_ERROR", e.message, e)
+                    promise.reject(genAiRejectCode(e) ?: "PROOFREAD_INFERENCE_ERROR", e.message, e)
                 } finally {
                     closeQuietly { proofreader.close() }
                 }
@@ -925,7 +963,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                     promise.resolve(text)
                 }
             } catch (e: Throwable) {
-                promise.reject("GENERATE_INFERENCE_ERROR", e.message, e)
+                promise.reject(genAiRejectCode(e) ?: "GENERATE_INFERENCE_ERROR", e.message, e)
             } finally {
                 try {
                     model?.close()
@@ -1075,7 +1113,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                     val result = describer.runInference(request).await()
                     promise.resolve(result.description ?: "")
                 } catch (e: Throwable) {
-                    promise.reject("DESCRIBE_INFERENCE_ERROR", e.message, e)
+                    promise.reject(genAiRejectCode(e) ?: "DESCRIBE_INFERENCE_ERROR", e.message, e)
                 } finally {
                     closeQuietly { describer.close() }
                 }

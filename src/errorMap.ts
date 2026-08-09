@@ -121,6 +121,37 @@ export const NATIVE_ERROR_MAP: Readonly<Record<string, Mapping>> = Object.freeze
     code: ErrorCodes.FEATURE_UNAVAILABLE,
     reason: 'model-not-ready',
   },
+
+  // ---- AICore said why, and the reason is actionable ----
+  // From GenAiException.getErrorCode(). These used to arrive as a generic
+  // inference failure, which told a caller nothing about what to do next.
+
+  // Inference is only permitted while the app is the foreground activity — a
+  // foreground service does not qualify. Retrying from the background will
+  // never work; retrying when the user returns will.
+  GENAI_BACKGROUND_BLOCKED: {
+    code: ErrorCodes.FEATURE_UNAVAILABLE,
+    reason: 'user-disabled',
+  },
+  // Per-app battery quota for on-device inference, refilled by the system.
+  GENAI_QUOTA_EXCEEDED: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'model-not-ready' },
+  // AICore is serving someone else. The definition of worth retrying.
+  GENAI_BUSY: { code: ErrorCodes.TIMEOUT },
+  GENAI_NO_DISK_SPACE: { code: ErrorCodes.MODEL_DOWNLOAD_FAILED },
+  // A system update would fix it, so it is not permanent, but the app cannot.
+  GENAI_NEEDS_SYSTEM_UPDATE: {
+    code: ErrorCodes.FEATURE_UNAVAILABLE,
+    reason: 'os-too-old',
+  },
+  // The AICore on this device cannot serve this build's request shape.
+  GENAI_AICORE_INCOMPATIBLE: {
+    code: ErrorCodes.FEATURE_UNAVAILABLE,
+    reason: 'hardware-ineligible',
+  },
+  GENAI_CANCELLED: { code: ErrorCodes.CANCELLED },
+  // The caller's fault, and fixable by them: the Prompt API has a token ceiling.
+  GENAI_REQUEST_TOO_LARGE: { code: ErrorCodes.INVALID_INPUT },
+  GENAI_REQUEST_TOO_SMALL: { code: ErrorCodes.INVALID_INPUT },
 });
 
 export function mapNativeCode(nativeCode: string): Mapping {

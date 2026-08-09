@@ -82,6 +82,20 @@ recognition already refuses to fall back to Apple's servers for every caller.
 ## Device-class gotchas
 
 - **iOS Foundation Models** (`summarizeText`, `rewriteText`, `generateText`, `chat` on iOS) require iOS 26+ on Apple-Intelligence-eligible hardware (iPhone 15 Pro / Pro Max, every iPhone 16 / 17, M-series iPad / Mac) **and** Apple Intelligence enabled in Settings. On any other configuration these methods reject `FEATURE_UNAVAILABLE` with a precise reason from `SystemLanguageModel.availability`. **Compiled against the real SDK, but never observed running on eligible hardware — see the note at the top.**
+### Two AICore constraints that surprise people
+
+**Inference only runs while your app is the foreground activity.** Not a
+foreground service — the actual visible activity. A generative call from a
+background task rejects with `FEATURE_UNAVAILABLE` and reason `user-disabled`,
+carrying `GENAI_BACKGROUND_BLOCKED` as the platform code. Schedule the work for
+when the user is looking at your app, rather than retrying in the background
+where it can never succeed.
+
+**There is a per-app battery quota.** Spend it and calls reject until the
+system refills it — `GENAI_QUOTA_EXCEEDED`, reason `model-not-ready`. Treat
+generative calls as a metered resource and do not loop over a list of items
+without a user asking for each.
+
 - **ML Kit GenAI** on Android needs AICore, which serves **Gemini Nano**. Two device sets, not one, and this catches people out:
   - `summarizeText`, `rewriteText`, `proofreadText`, `describeImage` — the feature APIs, the wider set.
   - `generateText`, `chat` — the Prompt API, a strict subset. **The Galaxy S25, S25+ and S25 Ultra support the feature APIs but not the Prompt API**, so `summarize` works there and `generate` does not.

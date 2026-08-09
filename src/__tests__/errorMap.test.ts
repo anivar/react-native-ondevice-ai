@@ -32,10 +32,19 @@ const NATIVE_FILES = [
  */
 const REJECT_CODE = /reject\(\s*@?"([A-Z][A-Z0-9_]{2,})"/g;
 
+/**
+ * Codes returned from a helper rather than passed to reject() directly — the
+ * Kotlin `-> "GENAI_BUSY"` arms that translate an AICore error code. Without
+ * this the coverage check above passes while the codes it should be covering
+ * are invisible to it.
+ */
+const MAPPED_CODE = /->\s*"([A-Z][A-Z0-9_]{2,})"/g;
+
 function codesIn(relPath: string): string[] {
   const source = readFileSync(join(ROOT, relPath), 'utf8');
   const found = new Set<string>();
   for (const m of source.matchAll(REJECT_CODE)) found.add(m[1]);
+  for (const m of source.matchAll(MAPPED_CODE)) found.add(m[1]);
   return [...found].sort();
 }
 
@@ -51,6 +60,17 @@ describe('errorMap covers every native reject code', () => {
       expect(unmapped).toEqual([]);
     });
   }
+});
+
+describe('the coverage check sees helper-returned codes', () => {
+  it('finds the AICore translations, not only reject() literals', () => {
+    const codes = codesIn('android/src/main/java/com/anivar/ondeviceai/AIToolkitTurboModule.kt');
+    // These are returned from genAiRejectCode(), never passed to reject()
+    // directly, so the reject()-only regex could not see them.
+    expect(codes).toContain('GENAI_BACKGROUND_BLOCKED');
+    expect(codes).toContain('GENAI_QUOTA_EXCEEDED');
+    expect(codes).toContain('GENAI_NEEDS_SYSTEM_UPDATE');
+  });
 });
 
 describe('mapNativeCode', () => {
