@@ -52,8 +52,12 @@ const ARTICLE = [
 
 export type CheckOutcome = 'resolved' | 'rejected' | 'threw';
 
+/** Sections in the report. Generative is the tier that needs real hardware. */
+export type CheckGroup = 'Text' | 'Vision' | 'Generative';
+
 export interface CheckResult {
   name: string;
+  group: CheckGroup;
   outcome: CheckOutcome;
   ms: number;
   /** Present when rejected: the typed code and reason a caller would branch on. */
@@ -65,6 +69,7 @@ export interface CheckResult {
 
 interface Check {
   name: string;
+  group: CheckGroup;
   run: () => Promise<unknown>;
   /** Turns a resolved value into something worth reading in a report. */
   describe?: (value: never) => string;
@@ -73,6 +78,7 @@ interface Check {
 const CHECKS: Check[] = [
   {
     name: 'getDeviceCapabilities',
+    group: 'Text',
     run: () => getDeviceCapabilities(),
     describe: (c: never) => {
       const caps = c as unknown as Awaited<ReturnType<typeof getDeviceCapabilities>>;
@@ -81,34 +87,52 @@ const CHECKS: Check[] = [
   },
   {
     name: 'analyzeText',
+    group: 'Text',
     run: () => analyzeText('I really like this app', { includeSentiment: true }),
     describe: (v: never) => JSON.stringify(v).slice(0, 120),
   },
-  { name: 'extractEntities', run: () => extractEntities('Call me on 555-0100 tomorrow') },
-  { name: 'identifyLanguage', run: () => identifyLanguage('bonjour tout le monde') },
-  { name: 'translateText', run: () => translateText('good morning', 'en', 'es') },
+  {
+    name: 'extractEntities',
+    group: 'Text',
+    run: () => extractEntities('Call me on 555-0100 tomorrow'),
+  },
+  { name: 'identifyLanguage', group: 'Text', run: () => identifyLanguage('bonjour tout le monde') },
+  { name: 'translateText', group: 'Text', run: () => translateText('good morning', 'en', 'es') },
   {
     name: 'smartReplies',
+    group: 'Text',
     run: () =>
       smartReplies([
         { text: 'Are we still on for lunch?', fromUser: false, timestampMs: 1_700_000_000_000 },
       ]),
   },
 
-  { name: 'analyzeImage', run: () => analyzeImage(TINY_PNG) },
-  { name: 'scanBarcodes', run: () => scanBarcodes(TINY_PNG) },
-  { name: 'labelImage', run: () => labelImage(TINY_PNG) },
-  { name: 'segmentPerson', run: () => segmentPerson(TINY_PNG) },
+  { name: 'analyzeImage', group: 'Vision', run: () => analyzeImage(TINY_PNG) },
+  { name: 'scanBarcodes', group: 'Vision', run: () => scanBarcodes(TINY_PNG) },
+  { name: 'labelImage', group: 'Vision', run: () => labelImage(TINY_PNG) },
+  { name: 'segmentPerson', group: 'Vision', run: () => segmentPerson(TINY_PNG) },
 
   // The generative tier. On a device without AICore or Apple Intelligence every
   // one of these should reject with FEATURE_UNAVAILABLE and a permanent reason,
   // which is a pass for this harness.
-  { name: 'summarize', run: () => summarize(ARTICLE) },
-  { name: 'rewriteText', run: () => rewriteText('the meeting got moved again', 'professional') },
-  { name: 'proofreadText', run: () => proofreadText('their going to the store') },
-  { name: 'generateText', run: () => generateText('Name three colours.') },
-  { name: 'chat', run: () => chat([{ role: 'user', content: 'Say hello in five words.' }]) },
-  { name: 'describeImage', run: () => describeImage(TINY_PNG) },
+  { name: 'summarize', group: 'Generative', run: () => summarize(ARTICLE) },
+  {
+    name: 'rewriteText',
+    group: 'Generative',
+    run: () => rewriteText('the meeting got moved again', 'professional'),
+  },
+  {
+    name: 'proofreadText',
+    group: 'Generative',
+    run: () => proofreadText('their going to the store'),
+  },
+  { name: 'generateText', group: 'Generative', run: () => generateText('Name three colours.') },
+  {
+    name: 'chat',
+    group: 'Generative',
+    run: () => chat([{ role: 'user', content: 'Say hello in five words.' }]),
+  },
+  { name: 'describeImage', group: 'Generative', run: () => describeImage(TINY_PNG) },
 ];
 
 function preview(value: unknown, describe?: Check['describe']): string {
@@ -133,6 +157,7 @@ async function runOne(check: Check): Promise<CheckResult> {
     const value = await check.run();
     return {
       name: check.name,
+      group: check.group,
       outcome: 'resolved',
       ms: Date.now() - started,
       detail: preview(value, check.describe),
@@ -143,6 +168,7 @@ async function runOne(check: Check): Promise<CheckResult> {
       const err = e as AIError;
       return {
         name: check.name,
+        group: check.group,
         outcome: 'rejected',
         ms,
         code: err.code,
@@ -154,6 +180,7 @@ async function runOne(check: Check): Promise<CheckResult> {
     // failure — every native rejection is supposed to arrive typed.
     return {
       name: check.name,
+      group: check.group,
       outcome: 'threw',
       ms,
       detail: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
@@ -171,6 +198,15 @@ export async function runVerification(
     onProgress?.([...results], CHECKS.length);
   }
   return results;
+}
+
+/** Counts for the summary bar. */
+export function tally(results: CheckResult[]) {
+  return {
+    ok: results.filter((r) => r.outcome === 'resolved').length,
+    rejected: results.filter((r) => r.outcome === 'rejected').length,
+    untyped: results.filter((r) => r.outcome === 'threw').length,
+  };
 }
 
 /** A plain-text report, sized to paste into an issue. */

@@ -32,7 +32,7 @@ import {
   summarize,
 } from 'react-native-ondevice-ai';
 import { dark, light, stateColor, type Theme } from './theme';
-import { type CheckResult, formatReport, runVerification } from './verify';
+import { type CheckGroup, type CheckResult, formatReport, runVerification, tally } from './verify';
 
 const ARTICLE = [
   'The city council approved the new transit plan on Tuesday evening.',
@@ -41,6 +41,22 @@ const ARTICLE = [
   'Funding comes from a bond measure voters approved last year.',
   'Construction is expected to begin in the spring.',
 ].join(' ');
+
+const GROUPS: CheckGroup[] = ['Text', 'Vision', 'Generative'];
+const TOTAL_CHECKS = 16;
+
+/** A returned call reads as success; a typed refusal is neutral; untyped is the alarm. */
+function pillStyle(t: Theme, c: CheckResult) {
+  if (c.outcome === 'resolved') return { backgroundColor: `${t.sage}22`, borderColor: t.sage };
+  if (c.outcome === 'rejected') return { backgroundColor: `${t.indigo}18`, borderColor: t.indigo };
+  return { backgroundColor: `${t.seal}22`, borderColor: t.seal };
+}
+
+function pillInk(t: Theme, c: CheckResult) {
+  if (c.outcome === 'resolved') return t.sage;
+  if (c.outcome === 'rejected') return t.indigo;
+  return t.seal;
+}
 
 export default function App() {
   const scheme = useColorScheme();
@@ -93,6 +109,7 @@ export default function App() {
   }, []);
 
   const report = useMemo(() => (checks ? formatReport(checks) : ''), [checks]);
+  const counts = useMemo(() => tally(checks ?? []), [checks]);
 
   return (
     <SafeAreaView style={s.screen}>
@@ -158,42 +175,79 @@ export default function App() {
 
         <TouchableOpacity style={s.button} onPress={runChecks} disabled={verifying}>
           {verifying ? (
-            <ActivityIndicator color={theme.paper} />
+            <View style={s.buttonRow}>
+              <ActivityIndicator color={theme.paper} />
+              <Text style={s.buttonText}>
+                {'  '}
+                {checks?.length ?? 0} of {TOTAL_CHECKS}
+              </Text>
+            </View>
           ) : (
-            <Text style={s.buttonText}>Run all checks</Text>
+            <Text style={s.buttonText}>{checks ? 'Run again' : 'Run all checks'}</Text>
           )}
         </TouchableOpacity>
 
         {checks && checks.length > 0 && (
           <>
-            <View style={s.card}>
-              {checks.map((c, i) => (
-                <View key={c.name} style={[s.row, i === checks.length - 1 && s.rowLast]}>
-                  <Text style={s.feature}>{c.name}</Text>
-                  <View style={s.rowRight}>
-                    <Text
-                      style={[
-                        s.state,
-                        {
-                          color:
-                            c.outcome === 'resolved'
-                              ? stateColor(theme, 'available')
-                              : c.outcome === 'rejected'
-                                ? stateColor(theme, 'downloadable')
-                                : stateColor(theme, 'unavailable'),
-                        },
-                      ]}
-                    >
-                      {c.outcome === 'threw' ? 'untyped failure' : c.outcome}
-                    </Text>
-                    <Text style={s.reason}>
-                      {c.code ? `${c.code}${c.reason ? ` / ${c.reason}` : ''} · ` : ''}
-                      {c.ms}ms
-                    </Text>
+            <View style={s.tallyRow}>
+              <View style={[s.tallyChip, { borderColor: theme.sage }]}>
+                <Text style={[s.tallyNum, { color: theme.sage }]}>{counts.ok}</Text>
+                <Text style={s.tallyLabel}>returned</Text>
+              </View>
+              <View style={[s.tallyChip, { borderColor: theme.indigo }]}>
+                <Text style={[s.tallyNum, { color: theme.indigo }]}>{counts.rejected}</Text>
+                <Text style={s.tallyLabel}>typed refusal</Text>
+              </View>
+              <View
+                style={[s.tallyChip, { borderColor: counts.untyped > 0 ? theme.seal : theme.rule }]}
+              >
+                <Text
+                  style={[s.tallyNum, { color: counts.untyped > 0 ? theme.seal : theme.inkFaint }]}
+                >
+                  {counts.untyped}
+                </Text>
+                <Text style={s.tallyLabel}>untyped</Text>
+              </View>
+            </View>
+
+            {counts.untyped > 0 && (
+              <Text style={s.alarm}>
+                An untyped failure is a defect — a native rejection escaped the error taxonomy.
+                Worth reporting.
+              </Text>
+            )}
+
+            {GROUPS.map((group) => {
+              const rows = checks.filter((c) => c.group === group);
+              if (rows.length === 0) return null;
+              return (
+                <View key={group}>
+                  <Text style={s.groupLabel}>{group}</Text>
+                  <View style={s.card}>
+                    {rows.map((c, i) => (
+                      <View key={c.name} style={[s.row, i === rows.length - 1 && s.rowLast]}>
+                        <View style={s.rowLeft}>
+                          <Text style={s.feature}>{c.name}</Text>
+                          {c.code && <Text style={s.reason}>{c.code}</Text>}
+                        </View>
+                        <View style={s.rowRight}>
+                          <View style={[s.pill, pillStyle(theme, c)]}>
+                            <Text style={[s.pillText, { color: pillInk(theme, c) }]}>
+                              {c.outcome === 'resolved'
+                                ? 'returned'
+                                : c.outcome === 'rejected'
+                                  ? (c.reason ?? 'refused')
+                                  : 'untyped'}
+                            </Text>
+                          </View>
+                          <Text style={s.ms}>{c.ms}ms</Text>
+                        </View>
+                      </View>
+                    ))}
                   </View>
                 </View>
-              ))}
-            </View>
+              );
+            })}
 
             <Text style={s.note}>
               Long-press to select and share this report — it is what turns "it built" into evidence
@@ -294,6 +348,51 @@ function makeStyles(t: Theme) {
     rowLast: { borderBottomWidth: 0 },
     rowRight: { alignItems: 'flex-end', flexShrink: 1, paddingLeft: 12 },
     feature: { fontSize: 13, fontFamily: 'Menlo', color: t.ink },
+
+    rowLeft: { flexShrink: 1, paddingRight: 10 },
+    ms: { fontSize: 10, color: t.inkFaint, fontFamily: 'Menlo', marginTop: 3 },
+
+    // A pill reads at a glance where coloured body text does not, and the three
+    // outcomes want to be distinguishable without reading the word.
+    pill: {
+      borderRadius: 999,
+      borderWidth: 1,
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+    },
+    pillText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.1 },
+
+    groupLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: t.inkFaint,
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+      marginTop: 18,
+      marginBottom: 2,
+    },
+
+    tallyRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
+    tallyChip: {
+      flex: 1,
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingVertical: 10,
+      alignItems: 'center',
+      backgroundColor: t.surface,
+    },
+    tallyNum: { fontSize: 20, fontWeight: '700' },
+    tallyLabel: { fontSize: 10, color: t.inkMuted, marginTop: 2 },
+
+    alarm: {
+      fontSize: 12,
+      color: t.seal,
+      lineHeight: 17,
+      marginTop: 10,
+      fontWeight: '600',
+    },
+
+    buttonRow: { flexDirection: 'row', alignItems: 'center' },
     report: { fontSize: 11, fontFamily: 'Menlo', color: t.ink, lineHeight: 16 },
     state: { fontSize: 13, fontWeight: '600' },
     reason: { fontSize: 11, color: t.inkFaint },

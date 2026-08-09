@@ -82,7 +82,9 @@ For devices with no generative model, `summarize()` falls back to a bundled extr
 
 ## Status
 
-Every line of Kotlin, Swift and ObjC++ is compiled by CI on each pull request, and CI asserts the library was actually linked. The Apple Foundation Models path compiles against the real SDK but has never been observed running on eligible hardware — nobody on the project owns one. If you do, [ten minutes closes it](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/contributing-hardware.md).
+Every line of Kotlin, Swift and ObjC++ is compiled by CI on each pull request, inside a generated host app, and CI asserts this library was actually linked and that none of its build tasks failed. The native sources are checked for networking symbols, the Android manifest for permissions beyond an allowlist, and the podspec for agreement with the manifest it ships in.
+
+The generative routes bind to Apple Foundation Models and ML Kit GenAI, which need an Apple Intelligence iPhone and an AICore Android respectively — hardware no CI runner has. The example app has a screen that runs every method and produces a shareable report; if you own one of those devices, [that report is the most useful thing anyone can send](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/contributing-hardware.md).
 
 ## About
 

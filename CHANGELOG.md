@@ -56,10 +56,10 @@ and that none of its build tasks failed. The native sources are checked for
 networking symbols and the Android manifest for permissions beyond an
 allowlist.
 
-Two paths compile against their SDKs but have not been observed running:
-Apple Foundation Models needs an Apple Intelligence device, and ML Kit GenAI
-needs an AICore one. No CI runner has either. The README says which features
-that covers, and a single report from real hardware is worth more than most
-code changes right now.
+The generative routes bind to Apple Foundation Models and ML Kit GenAI, which
+need an Apple Intelligence iPhone and an AICore Android — hardware no CI runner
+has. The example app ships a screen that exercises every method and produces a
+shareable report, and a report from one of those devices is worth more than
+most code changes right now.
 
 [0.1.0]: https://github.com/anivar/react-native-ondevice-ai/releases/tag/0.1.0
