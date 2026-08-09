@@ -21,7 +21,7 @@ Every method below maps to a real platform call. ✅ = on-device. 🧪 = compile
 | `proofreadText(text)` | ✅ `UITextChecker` *(spelling only)* | ✅ ML Kit GenAI `Proofreader` *(Beta, AICore)* |
 | `summarizeText(text, fmt)` | 🧪 Foundation Models *(iOS 26+, Apple Intelligence — unverified on hardware)* | ✅ ML Kit GenAI `Summarizer` *(Beta, AICore)* |
 | `rewriteText(text, style)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Rewriter` *(Beta, AICore)* |
-| `generateText(prompt, opts)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Prompt` API *(Beta, Gemini Nano / Gemma 4 via AICore)* |
+| `generateText(prompt, opts)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Prompt` API *(Beta, Gemini Nano via AICore)* |
 | `chat(messages, opts)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Prompt` API (history flattened to single-shot prompt) |
 | `smartReplies(messages)` | ❌ — no public iOS equivalent | ✅ ML Kit `SmartReply` (GA) |
 | `translateText(text, src, tgt)` | ❌ — `TranslationSession` needs a SwiftUI host; see below | ✅ ML Kit `Translator` (GA, downloads language pack on first use) |

@@ -54,7 +54,10 @@ that hangs, crashes, or comes back as an untyped error.
 ## If you have generative hardware
 
 A Pixel 9 or 10, a Galaxy S25, or an iPhone with Apple Intelligence on iOS 26
-can exercise paths that no CI runner can reach. The generative rows in the
+can exercise paths that no CI runner can reach. Note that the Galaxy S25 family
+supports the feature APIs but not the Prompt API, so `generateText` and `chat`
+are expected to reject there while `summarize` works — that is the library
+being correct, not broken. The generative rows in the
 report from such a device are the most useful thing anyone can contribute to
 this project right now — long-press the report, share it, and open an issue
 with it.

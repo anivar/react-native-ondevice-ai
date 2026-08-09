@@ -23,5 +23,9 @@ full error if it threw. A failure is as useful as a success; if the bridge is
 wrong I would rather know now than have it sit broken.
 
 Also welcome: Swift reviewers for `ios/AIToolkitFoundationModels.swift`, and
-bug reports from Pixel 9+ / Galaxy S25+ owners against the ML Kit GenAI beta.
+bug reports from AICore device owners against the ML Kit GenAI beta. A Pixel 9
+or 10 exercises both the feature APIs and the Prompt API; a Galaxy S25 is
+useful for the opposite reason — it should support `summarize` and reject
+`generate`, and confirming that split on real hardware is worth as much as a
+report where everything works.
 

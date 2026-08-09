@@ -82,7 +82,13 @@ recognition already refuses to fall back to Apple's servers for every caller.
 ## Device-class gotchas
 
 - **iOS Foundation Models** (`summarizeText`, `rewriteText`, `generateText`, `chat` on iOS) require iOS 26+ on Apple-Intelligence-eligible hardware (iPhone 15 Pro / Pro Max, every iPhone 16 / 17, M-series iPad / Mac) **and** Apple Intelligence enabled in Settings. On any other configuration these methods reject `FEATURE_UNAVAILABLE` with a precise reason from `SystemLanguageModel.availability`. **Compiled against the real SDK, but never observed running on eligible hardware — see the note at the top.**
-- **ML Kit GenAI** (`summarizeText`, `rewriteText`, `proofreadText`, `describeImage`, `generateText`, `chat` on Android) runs only on AICore-enabled devices: Pixel 9+, Samsung S25+, and select 2024–2026 flagships from Xiaomi / OPPO / Honor with locked bootloaders. Pixel 10+ uses Gemma 4 via AICore. On unsupported devices these methods reject with `FEATURE_UNAVAILABLE` — check `caps.availability.<method>.state` first, or call `explainCall('<method>')`.
+- **ML Kit GenAI** on Android needs AICore, which serves **Gemini Nano**. Two device sets, not one, and this catches people out:
+  - `summarizeText`, `rewriteText`, `proofreadText`, `describeImage` — the feature APIs, the wider set.
+  - `generateText`, `chat` — the Prompt API, a strict subset. **The Galaxy S25, S25+ and S25 Ultra support the feature APIs but not the Prompt API**, so `summarize` works there and `generate` does not.
+
+  Both sets require a locked bootloader. Do not hardcode either list: AICore updates its model and its configuration through the system, without your app being updated, so a device's answer changes over time. Ask at runtime — `caps.availability.<method>.state`, or `explainCall('<method>')` — and treat the published device lists as illustration only.
+
+  Note also that Gemma is **not** what AICore runs. Gemma is a separate, self-hosted model family you would load yourself through MediaPipe or LiteRT, with multi-gigabyte weights this package does not ship.
 - **iOS on-device speech** (`SFSpeechRecognizer.supportsOnDeviceRecognition`) returns true on most modern devices but can be false for locales whose speech model isn't installed.
 - **iOS proofread** uses `UITextChecker` and is spelling-only; the Apple Intelligence Writing Tools rewrite UI has no programmatic invocation API.
 - **iOS embeddings** require iOS 17+ and a model loaded for the script of the input (Latin / CJK / Cyrillic / etc.); unsupported scripts reject with `FEATURE_UNAVAILABLE`.

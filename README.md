@@ -42,7 +42,7 @@ if (availability.summarize.state === 'available') {
 
 ## The part that makes this different
 
-Most phones cannot run a generative model. Gemini Nano needs AICore — Pixel 9+, Galaxy S25+ — and Apple Foundation Models needs an Apple-Intelligence device on iOS 26. **So the interesting question is not what the API does, it is what your user's phone can actually do.**
+Most phones cannot run a generative model. Gemini Nano needs AICore and Apple Foundation Models needs an Apple-Intelligence device on iOS 26 — and even among AICore devices the coverage splits, with the Galaxy S25 family supporting `summarize` but not `generate`. AICore also updates its model through the system, so a device's answer changes without your app being touched. **So the interesting question is not what the API does, it is what your user's phone can do right now.**
 
 `availability` answers that per feature, with a reason:
 

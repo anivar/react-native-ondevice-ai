@@ -50,13 +50,15 @@ export const NATIVE_ERROR_MAP: Readonly<Record<string, Mapping>> = Object.freeze
   // .availability). Until that is lifted into `reason`, this stays honestly
   // unknown rather than guessing.
   FEATURE_UNAVAILABLE: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'unknown' },
-  // Android does lift it: checkFeatureStatus() returns UNAVAILABLE for a device
-  // AICore will never serve, which is a permanent hardware fact, not a
-  // "not yet".
-  GENAI_UNAVAILABLE: {
-    code: ErrorCodes.FEATURE_UNAVAILABLE,
-    reason: 'hardware-ineligible',
-  },
+  // Deliberately not `hardware-ineligible`. FeatureStatus.UNAVAILABLE is also
+  // what a supported device returns while AICore is still fetching its
+  // configuration — Google documents that as taking anywhere from minutes to
+  // hours — and nothing in the API distinguishes that from a device AICore will
+  // never serve. `hardware-ineligible` means "hide this forever" here, so
+  // claiming it from an ambiguous signal would tell callers to permanently
+  // remove a feature that may appear on its own. The message carries the raw
+  // status.
+  GENAI_UNAVAILABLE: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'unknown' },
   RECOGNIZER_UNAVAILABLE: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'unknown' },
   // The user said no, or was never asked. Not a device limitation — it can be
   // reversed in Settings, which is why it is `user-disabled` and not

@@ -65,6 +65,9 @@ import androidx.concurrent.futures.await
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
@@ -119,13 +122,14 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                 putMap("extractEntities", downloadableOnFirstUse())
                 putMap("translate", downloadableOnFirstUse())
 
-                // GenAI: the real per-feature answer from AICore.
-                putMap("summarize", genAi.copy())
-                putMap("rewrite", genAi.copy())
-                putMap("proofread", genAi.copy())
-                putMap("generate", genAi.copy())
-                putMap("chat", genAi.copy())
-                putMap("describeImage", genAi.copy())
+                // GenAI: one answer per feature, because AICore gives one per
+                // feature. `chat` rides on the Prompt API, same as `generate`.
+                putMap("summarize", genAi.getValue("summarize").copy())
+                putMap("rewrite", genAi.getValue("rewrite").copy())
+                putMap("proofread", genAi.getValue("proofread").copy())
+                putMap("describeImage", genAi.getValue("describeImage").copy())
+                putMap("generate", genAi.getValue("generate").copy())
+                putMap("chat", genAi.getValue("generate").copy())
 
                 // No Android API at all for these two.
                 putMap("embedText", unavailable("no-platform-api",
@@ -140,10 +144,22 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
                 putString("osVersion", Build.VERSION.RELEASE)
                 putBoolean("hasNeuralEngine", false)
                 putBoolean("hasAppleIntelligence", false)
-                val genAiUsable = genAi.getString("state") != "unavailable"
-                putBoolean("hasGeminiNano", genAiUsable)
-                putBoolean("hasMLKitGenAI", genAiUsable)
-                putBoolean("hasOnDeviceSpeech", SpeechRecognizer.isRecognitionAvailable(reactContext))
+                val promptUsable = genAi.getValue("generate").getString("state") != "unavailable"
+                val featureUsable = genAi.getValue("summarize").getString("state") != "unavailable"
+                // hasGeminiNano is a Prompt-API-shaped question; hasMLKitGenAI
+                // covers the wider feature-API set. They differ on real devices.
+                putBoolean("hasGeminiNano", promptUsable)
+                putBoolean("hasMLKitGenAI", featureUsable)
+                // isRecognitionAvailable() answers "is there *a* recognizer",
+                // including a network one, so it over-reports on-device
+                // capability. The on-device question has its own API, added in
+                // API 31; below that Android has no on-device recognizer to ask
+                // about.
+                putBoolean(
+                    "hasOnDeviceSpeech",
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                        SpeechRecognizer.isOnDeviceRecognitionAvailable(reactContext)
+                )
 
                 putArray("supportedLanguages", Arguments.createArray().apply {
                     TranslateLanguage.getAllLanguages().forEach { pushString(it) }
@@ -200,74 +216,151 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
      * value carries the distinction that matters — AVAILABLE, DOWNLOADABLE or
      * DOWNLOADING.
      */
-    private fun probeGenAiAvailability(callback: (WritableMap) -> Unit) {
-        if (!isMLKitGenAIPresent()) {
-            callback(
-                unavailable(
-                    "not-linked",
-                    "The ML Kit GenAI dependency is not in this build."
+    /** The generative features, and the AICore client that actually answers for each. */
+    private enum class GenAiFeature(val key: String) {
+        SUMMARIZE("summarize"),
+        REWRITE("rewrite"),
+        PROOFREAD("proofread"),
+        DESCRIBE_IMAGE("describeImage"),
+        // The Prompt API. Separate from the four above in a way that matters:
+        // it covers strictly fewer devices — the Galaxy S25 family supports the
+        // feature APIs and not this one — so it needs its own probe.
+        PROMPT("generate"),
+    }
+
+    /** Turns one AICore status into the availability shape the JS side reads. */
+    private fun statusToAvailability(status: Int): WritableMap = when (status) {
+        FeatureStatus.AVAILABLE -> available()
+        FeatureStatus.DOWNLOADABLE -> availabilityMap(
+            "downloadable",
+            detail = "AICore can download the model for this feature.",
+            requiresNetwork = true
+        )
+        FeatureStatus.DOWNLOADING -> availabilityMap(
+            "downloading",
+            detail = "AICore is downloading the model for this feature."
+        )
+        // Not `hardware-ineligible`, which this package defines as permanent.
+        // A supported device also reports UNAVAILABLE while AICore fetches its
+        // configuration, and no API distinguishes that from a device AICore
+        // will never serve.
+        else -> availabilityMap(
+            "unavailable",
+            reason = "unknown",
+            detail = "AICore reports this feature unavailable here. That may be " +
+                "permanent, or configuration it has not finished downloading."
+        )
+    }
+
+    private suspend fun probeFeature(feature: GenAiFeature): WritableMap = try {
+        when (feature) {
+            GenAiFeature.SUMMARIZE -> {
+                val c = Summarization.getClient(
+                    SummarizerOptions.builder(reactContext)
+                        .setInputType(SummarizerOptions.InputType.ARTICLE)
+                        .setOutputType(SummarizerOptions.OutputType.THREE_BULLETS)
+                        .setLanguage(SummarizerOptions.Language.ENGLISH)
+                        .build()
                 )
+                try {
+                    statusToAvailability(c.checkFeatureStatus().await())
+                } finally {
+                    closeQuietly { c.close() }
+                }
+            }
+
+            GenAiFeature.REWRITE -> {
+                val c = Rewriting.getClient(
+                    RewriterOptions.builder(reactContext)
+                        .setOutputType(RewriterOptions.OutputType.REPHRASE)
+                        .setLanguage(RewriterOptions.Language.ENGLISH)
+                        .build()
+                )
+                try {
+                    statusToAvailability(c.checkFeatureStatus().await())
+                } finally {
+                    closeQuietly { c.close() }
+                }
+            }
+
+            GenAiFeature.PROOFREAD -> {
+                val c = Proofreading.getClient(
+                    ProofreaderOptions.builder(reactContext)
+                        .setLanguage(ProofreaderOptions.Language.ENGLISH)
+                        .build()
+                )
+                try {
+                    statusToAvailability(c.checkFeatureStatus().await())
+                } finally {
+                    closeQuietly { c.close() }
+                }
+            }
+
+            GenAiFeature.DESCRIBE_IMAGE -> {
+                val c = ImageDescription.getClient(
+                    ImageDescriberOptions.builder(reactContext).build()
+                )
+                try {
+                    statusToAvailability(c.checkFeatureStatus().await())
+                } finally {
+                    closeQuietly { c.close() }
+                }
+            }
+
+            GenAiFeature.PROMPT -> {
+                val c = Generation.getClient()
+                try {
+                    statusToAvailability(c.checkStatus())
+                } finally {
+                    closeQuietly { c.close() }
+                }
+            }
+        }
+    } catch (e: Throwable) {
+        availabilityMap(
+            "unavailable",
+            reason = "unknown",
+            detail = "AICore did not answer for this feature. ${e.message}"
+        )
+    }
+
+    /**
+     * Probes each generative feature separately.
+     *
+     * One probe copied across all six was wrong in a way a user meets: the
+     * feature APIs and the Prompt API do not cover the same devices, so a
+     * Galaxy S25 was told `generate` was available and then had it reject.
+     */
+    private fun probeGenAiAvailability(callback: (Map<String, WritableMap>) -> Unit) {
+        if (!isMLKitGenAIPresent()) {
+            val absent = unavailable(
+                "not-linked",
+                "The ML Kit GenAI dependency is not in this build."
             )
+            callback(GenAiFeature.entries.associate { it.key to absent.copy() })
             return
         }
 
-        val settled = java.util.concurrent.atomic.AtomicBoolean(false)
-        fun finish(map: WritableMap) {
-            if (settled.compareAndSet(false, true)) callback(map)
-        }
-
-        // A capability probe must never be the thing that hangs a screen.
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            finish(
-                availabilityMap(
-                    "unavailable",
-                    reason = "unknown",
-                    detail = "AICore did not answer within " +
-                        "${CAPABILITY_PROBE_TIMEOUT_MS}ms."
-                )
-            )
-        }, CAPABILITY_PROBE_TIMEOUT_MS)
-
-        try {
-            val summarizer = Summarization.getClient(
-                SummarizerOptions.builder(reactContext)
-                    .setInputType(SummarizerOptions.InputType.ARTICLE)
-                    .setOutputType(SummarizerOptions.OutputType.THREE_BULLETS)
-                    .setLanguage(SummarizerOptions.Language.ENGLISH)
-                    .build()
-            )
-            genAiScope.launch {
-                try {
-                    val status = summarizer.checkFeatureStatus().await()
-                    finish(
-                        when (status) {
-                            FeatureStatus.AVAILABLE -> available()
-                            FeatureStatus.DOWNLOADABLE -> availabilityMap(
-                                "downloadable",
-                                detail = "AICore can download the generative model for this device.",
-                                requiresNetwork = true
-                            )
-                            FeatureStatus.DOWNLOADING -> availabilityMap(
-                                "downloading",
-                                detail = "AICore is downloading the generative model."
-                            )
-                            else -> unavailable(
-                                "hardware-ineligible",
-                                "This device does not support ML Kit GenAI (AICore)."
-                            )
-                        }
-                    )
-                } catch (e: Throwable) {
-                    finish(
-                        unavailable(
-                            "hardware-ineligible",
-                            "AICore is not usable on this device. ${e.message}"
-                        )
-                    )
+        genAiScope.launch {
+            // A capability probe must never be the thing that hangs a screen,
+            // and five probes share one budget rather than each taking their own.
+            val probed = withTimeoutOrNull(CAPABILITY_PROBE_TIMEOUT_MS) {
+                coroutineScope {
+                    GenAiFeature.entries
+                        .map { feature -> feature to async { probeFeature(feature) } }
+                        .associate { (feature, deferred) -> feature.key to deferred.await() }
                 }
             }
-        } catch (e: Throwable) {
-            finish(unavailable("unknown", "GenAI probe failed: ${e.message}"))
+
+            callback(
+                probed ?: GenAiFeature.entries.associate {
+                    it.key to availabilityMap(
+                        "unavailable",
+                        reason = "unknown",
+                        detail = "AICore did not answer within ${CAPABILITY_PROBE_TIMEOUT_MS}ms."
+                    )
+                }
+            )
         }
     }
 
@@ -779,7 +872,7 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
         promise.reject(
             "FILE_TRANSCRIPTION_UNSUPPORTED",
             "Android does not expose a stable file-based SpeechRecognizer API. " +
-                "Use startTranscription() for live capture, or wire a TFLite ASR model."
+                "Android's SpeechRecognizer captures from the microphone only."
         )
     }
 

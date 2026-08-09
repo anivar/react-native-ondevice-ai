@@ -71,9 +71,12 @@ describe('mapNativeCode', () => {
   it('separates a device that never can from one that cannot yet', () => {
     // The distinction the availability API exists for: hide the button forever
     // versus try again in a minute.
+    // Not hardware-ineligible: AICore returns UNAVAILABLE while it is still
+    // fetching configuration on a device that does support the feature, and the
+    // API gives no way to tell that apart from permanent ineligibility.
     expect(mapNativeCode('GENAI_UNAVAILABLE')).toEqual({
       code: ErrorCodes.FEATURE_UNAVAILABLE,
-      reason: 'hardware-ineligible',
+      reason: 'unknown',
     });
     expect(mapNativeCode('GENAI_MODEL_DOWNLOADING')).toEqual({
       code: ErrorCodes.FEATURE_UNAVAILABLE,
