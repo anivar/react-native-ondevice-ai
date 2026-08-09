@@ -4,9 +4,8 @@
 
 Nothing leaves the device. There is no cloud tier and no `fetch`, and CI fails the build if a networking symbol appears in the native sources at all.
 
-[![npm](https://img.shields.io/npm/v/mobile-ai-toolkit/latest.svg?style=flat-square&label=npm&color=cb3837)](https://www.npmjs.com/package/mobile-ai-toolkit)
-[![CI](https://img.shields.io/github/actions/workflow/status/openslm-ai/mobile-ai-toolkit/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/openslm-ai/mobile-ai-toolkit/actions/workflows/ci.yml)
-&nbsp;·&nbsp; iOS 17+ &nbsp;·&nbsp; Android API 26+ &nbsp;·&nbsp; React Native 0.86+ &nbsp;·&nbsp; zero runtime dependencies &nbsp;·&nbsp; MIT
+Needs iOS 17+, Android API 26+ and React Native 0.86+ on the New Architecture.
+No runtime dependencies. MIT.
 
 ## Install
 
@@ -22,7 +21,7 @@ npm install mobile-ai-toolkit
 
 **Bare React Native** — raise `ios/Podfile` to `platform :ios, '17.0'` and `minSdkVersion` to `26`, then `pod install`. Both floors are required, not advisory: [why](https://github.com/openslm-ai/mobile-ai-toolkit/blob/main/docs/setup.md).
 
-Needs React Native 0.86+ and the New Architecture. A development build, not Expo Go.
+A development build, not Expo Go.
 
 ## Use it
 

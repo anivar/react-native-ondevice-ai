@@ -137,21 +137,43 @@ jobs:
           npm install
           npm install ../mobile-ai-toolkit
 
+      # The mirror of the iOS deployment-target step below. React Native 0.86's
+      # template ships minSdkVersion 24; ML Kit GenAI declares 26, and the
+      # manifest merger refuses to build the app without it. This is the exact
+      # step docs/setup.md asks a bare React Native developer to perform, and
+      # the one the Expo config plugin performs for them.
+      - name: Raise the host app's minSdkVersion
+        working-directory: HostApp/android
+        run: |
+          sed -i "s/minSdkVersion = 24/minSdkVersion = 26/" build.gradle
+          grep -n "minSdkVersion" build.gradle
+
+      # pipefail is not optional: without it the step exits with tee's status,
+      # so a FAILED compile reports success.
       - name: Assemble
         working-directory: HostApp/android
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace | tee /tmp/gradle.log
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace | tee /tmp/gradle.log
 
       # The first green run of this job compiled nothing of ours: autolinking
       # silently skipped the module, the host app built fine, and the job
       # reported success. A build that does not include the library under test
       # proves nothing, so assert the Kotlin was actually compiled.
       - name: Assert the library was actually compiled
+        if: always()
         run: |
           if ! grep -qE 'Task :anivar_mobile-ai-toolkit:compile.*Kotlin' /tmp/gradle.log; then
             echo "::error::The host app built without compiling this library."
             echo "::error::Autolinking did not pick it up, so this run verified nothing."
             echo "Gradle tasks that did run:"
             grep -oE '> Task :[^ ]+' /tmp/gradle.log | sort -u
+            exit 1
+          fi
+          if grep -qE 'Task :anivar_mobile-ai-toolkit:[^ ]+ FAILED' /tmp/gradle.log; then
+            echo "::error::A task belonging to this library failed:"
+            grep -oE '> Task :anivar_mobile-ai-toolkit:[^ ]+ FAILED' /tmp/gradle.log | sort -u
+            grep -E '^e: ' /tmp/gradle.log | head -40
             exit 1
           fi
           echo "Library compiled:"
