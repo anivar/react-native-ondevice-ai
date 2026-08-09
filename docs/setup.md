@@ -1,6 +1,6 @@
 # Setup
 
-Platform setup for `react-native-ondevice-ai`.
+Platform setup for `react-native-ondeviceai`.
 
 ### Bare React Native
 
@@ -39,7 +39,7 @@ Expo SDK 55+ requires the New Architecture, which is what this package targets,
 so a modern Expo app is a first-class host. Add the plugin:
 
 ```json
-{ "expo": { "plugins": ["react-native-ondevice-ai"] } }
+{ "expo": { "plugins": ["react-native-ondeviceai"] } }
 ```
 
 It sets three things: the Android `minSdkVersion` to 26, the iOS deployment

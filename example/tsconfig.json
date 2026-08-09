@@ -5,7 +5,7 @@
     "jsx": "react-native",
     "rootDir": "..",
     "paths": {
-      "react-native-ondevice-ai": ["../src/index"]
+      "react-native-ondeviceai": ["../src/index"]
     },
     "ignoreDeprecations": "6.0",
     "types": ["react-native", "@types/react"]

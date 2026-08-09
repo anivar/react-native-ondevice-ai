@@ -31,7 +31,7 @@ export function requireNative(feature: string): Spec {
     throw new AIError({
       code: ErrorCodes.MODULE_NOT_LINKED,
       message:
-        'The react-native-ondevice-ai native module is not linked. This is expected on ' +
+        'The react-native-ondeviceai native module is not linked. This is expected on ' +
         'Expo Go, react-native-web, and the old React Native architecture. Run ' +
         '`cd ios && pod install` (or rebuild the Android app) in a development ' +
         'build, and confirm the new architecture is enabled.',

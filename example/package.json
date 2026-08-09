@@ -12,8 +12,8 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-native": "^0.86.2",
-    "react-native-ondevice-ai": "file:..",
-    "expo": "~55.0.0"
+    "expo": "~55.0.0",
+    "react-native-ondeviceai": "file:.."
   },
   "devDependencies": {
     "@react-native/babel-preset": "^0.86.2",

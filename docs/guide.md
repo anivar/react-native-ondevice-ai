@@ -19,7 +19,7 @@ import {
   smartReplies,
   translateText,
   transcribeAudioFile,
-} from 'react-native-ondevice-ai';
+} from 'react-native-ondeviceai';
 
 // 1. Probe once at startup, gate UI on the feature map.
 const caps = await getDeviceCapabilities();
@@ -69,7 +69,7 @@ const t = await transcribeAudioFile('/path/to/clip.m4a', { locale: 'en-US' });
 ### Private mode
 
 ```ts
-import { enablePrivateMode, isPrivateModeEnabled } from 'react-native-ondevice-ai';
+import { enablePrivateMode, isPrivateModeEnabled } from 'react-native-ondeviceai';
 enablePrivateMode(true);
 ```
 

@@ -15,11 +15,11 @@
  *
  * Usage in app.json:
  *
- *   { "expo": { "plugins": ["react-native-ondevice-ai"] } }
+ *   { "expo": { "plugins": ["react-native-ondeviceai"] } }
  *
  * or, to customise the permission prompt:
  *
- *   { "expo": { "plugins": [["react-native-ondevice-ai", {
+ *   { "expo": { "plugins": [["react-native-ondeviceai", {
  *       "speechRecognitionPermission": "Used to transcribe your voice notes on device."
  *   }]] } }
  */

@@ -35,7 +35,7 @@ import {
   summarizeText,
   transcribeAudioFile,
   translateText,
-} from 'react-native-ondevice-ai';
+} from 'react-native-ondeviceai';
 
 /**
  * A 2x2 opaque PNG. The vision calls need *an* image, not a meaningful one:
@@ -243,5 +243,5 @@ export function formatReport(results: CheckResult[]): string {
       ? `${threw} call(s) failed outside the error taxonomy — that is a defect.`
       : 'Every call settled, and every failure was typed.';
 
-  return [`react-native-ondevice-ai device report`, '', ...lines, '', summary].join('\n');
+  return [`react-native-ondeviceai device report`, '', ...lines, '', summary].join('\n');
 }

@@ -10,13 +10,18 @@ No JS runtime dependencies. MIT.
 ## Install
 
 ```bash
-npm install react-native-ondevice-ai
+npm install react-native-ondeviceai
 ```
+
+The npm package name has no hyphen between "ondevice" and "ai" — a
+pre-existing, unrelated package reserves the hyphenated spelling and npm's
+name-similarity check blocks anything close to it. The repository and project
+name keep the hyphen; only the package you install differs.
 
 **Expo** — add the plugin and rebuild. It sets the SDK floors and the speech usage string for you:
 
 ```json
-{ "expo": { "plugins": ["react-native-ondevice-ai"] } }
+{ "expo": { "plugins": ["react-native-ondeviceai"] } }
 ```
 
 **Bare React Native** — raise `ios/Podfile` to `platform :ios, '17.0'` and `minSdkVersion` to `26`, then `pod install`. Both floors are required, not advisory: [why](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/setup.md).
@@ -26,7 +31,7 @@ A development build, not Expo Go.
 ## Use it
 
 ```ts
-import { getDeviceCapabilities, analyzeText, summarize } from 'react-native-ondevice-ai';
+import { getDeviceCapabilities, analyzeText, summarize } from 'react-native-ondeviceai';
 
 // Language ID and entities on every supported device, no model download.
 // Sentiment is iOS only — NaturalLanguage has it, ML Kit does not.
