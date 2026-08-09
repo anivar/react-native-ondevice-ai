@@ -68,6 +68,19 @@ describe('mapNativeCode', () => {
     expect(mapNativeCode('SUMMARIZE_INFERENCE_ERROR').code).toBe(ErrorCodes.INFERENCE_FAILED);
   });
 
+  it('separates a device that never can from one that cannot yet', () => {
+    // The distinction the availability API exists for: hide the button forever
+    // versus try again in a minute.
+    expect(mapNativeCode('GENAI_UNAVAILABLE')).toEqual({
+      code: ErrorCodes.FEATURE_UNAVAILABLE,
+      reason: 'hardware-ineligible',
+    });
+    expect(mapNativeCode('GENAI_MODEL_DOWNLOADING')).toEqual({
+      code: ErrorCodes.FEATURE_UNAVAILABLE,
+      reason: 'model-not-ready',
+    });
+  });
+
   it('gives the two platforms the same public code for the same situation', () => {
     // Embeddings are absent on Android and can be unavailable on iOS; a caller
     // should not have to know which native string it got.

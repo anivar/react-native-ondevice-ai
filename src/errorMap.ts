@@ -47,9 +47,16 @@ export const NATIVE_ERROR_MAP: Readonly<Record<string, Mapping>> = Object.freeze
   ON_DEVICE_UNSUPPORTED: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'no-platform-api' },
   UNSUPPORTED_OS: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'os-too-old' },
   // The precise cause is carried in the message on iOS (SystemLanguageModel
-  // .availability) and on Android (ML Kit checkFeatureStatus). Until that is
-  // lifted into `reason`, this stays honestly unknown rather than guessing.
+  // .availability). Until that is lifted into `reason`, this stays honestly
+  // unknown rather than guessing.
   FEATURE_UNAVAILABLE: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'unknown' },
+  // Android does lift it: checkFeatureStatus() returns UNAVAILABLE for a device
+  // AICore will never serve, which is a permanent hardware fact, not a
+  // "not yet".
+  GENAI_UNAVAILABLE: {
+    code: ErrorCodes.FEATURE_UNAVAILABLE,
+    reason: 'hardware-ineligible',
+  },
   RECOGNIZER_UNAVAILABLE: { code: ErrorCodes.FEATURE_UNAVAILABLE, reason: 'unknown' },
   // The user said no, or was never asked. Not a device limitation — it can be
   // reversed in Settings, which is why it is `user-disabled` and not
@@ -105,6 +112,13 @@ export const NATIVE_ERROR_MAP: Readonly<Record<string, Mapping>> = Object.freeze
   // would mean a network request. Transient: it resolves the moment the model
   // is present, or private mode is turned off once.
   MODEL_NOT_DOWNLOADED: { code: ErrorCodes.MODEL_NOT_DOWNLOADED },
+  // AICore is fetching the model right now. The device is capable and the call
+  // will work shortly, so this is `model-not-ready` rather than an error the
+  // caller should hide a feature over.
+  GENAI_MODEL_DOWNLOADING: {
+    code: ErrorCodes.FEATURE_UNAVAILABLE,
+    reason: 'model-not-ready',
+  },
 });
 
 export function mapNativeCode(nativeCode: string): Mapping {

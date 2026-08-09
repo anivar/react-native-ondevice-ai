@@ -530,8 +530,15 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
             val summarizer: Summarizer = Summarization.getClient(opts)
             genAiScope.launch {
                 try {
-                    summarizer.checkFeatureStatus().await()
-                    summarizer.prepareInferenceEngine().await()
+                    val status = summarizer.checkFeatureStatus().await()
+                    if (!genAiStatusAllowsRun(status, "summarization", promise)) return@launch
+
+                    try {
+                        summarizer.prepareInferenceEngine().await()
+                    } catch (e: Throwable) {
+                        promise.reject("SUMMARIZE_PREPARE_ERROR", e.message, e)
+                        return@launch
+                    }
 
                     val request = SummarizationRequest.builder(text).build()
                     val sb = StringBuilder()
@@ -566,8 +573,15 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
             val rewriter: Rewriter = Rewriting.getClient(opts)
             genAiScope.launch {
                 try {
-                    rewriter.checkFeatureStatus().await()
-                    rewriter.prepareInferenceEngine().await()
+                    val status = rewriter.checkFeatureStatus().await()
+                    if (!genAiStatusAllowsRun(status, "rewriting", promise)) return@launch
+
+                    try {
+                        rewriter.prepareInferenceEngine().await()
+                    } catch (e: Throwable) {
+                        promise.reject("REWRITE_PREPARE_ERROR", e.message, e)
+                        return@launch
+                    }
 
                     val request = RewritingRequest.builder(text).build()
                     val result = rewriter.runInference(request).await()
@@ -591,8 +605,15 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
             val proofreader: Proofreader = Proofreading.getClient(opts)
             genAiScope.launch {
                 try {
-                    proofreader.checkFeatureStatus().await()
-                    proofreader.prepareInferenceEngine().await()
+                    val status = proofreader.checkFeatureStatus().await()
+                    if (!genAiStatusAllowsRun(status, "proofreading", promise)) return@launch
+
+                    try {
+                        proofreader.prepareInferenceEngine().await()
+                    } catch (e: Throwable) {
+                        promise.reject("PROOFREAD_PREPARE_ERROR", e.message, e)
+                        return@launch
+                    }
 
                     val request = ProofreadingRequest.builder(text).build()
                     val result = proofreader.runInference(request).await()
@@ -947,8 +968,15 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
             val describer: ImageDescriber = ImageDescription.getClient(opts)
             genAiScope.launch {
                 try {
-                    describer.checkFeatureStatus().await()
-                    describer.prepareInferenceEngine().await()
+                    val status = describer.checkFeatureStatus().await()
+                    if (!genAiStatusAllowsRun(status, "image description", promise)) return@launch
+
+                    try {
+                        describer.prepareInferenceEngine().await()
+                    } catch (e: Throwable) {
+                        promise.reject("DESCRIBE_PREPARE_ERROR", e.message, e)
+                        return@launch
+                    }
 
                     val request = ImageDescriptionRequest.builder(bitmap).build()
                     val result = describer.runInference(request).await()
@@ -1035,6 +1063,45 @@ class AIToolkitTurboModule(private val reactContext: ReactApplicationContext) :
         genAiScope.cancel()
         super.invalidate()
     }
+
+    /**
+     * Turns a FeatureStatus into the taxonomy the JS side documents, and
+     * returns whether the caller should proceed.
+     *
+     * Every GenAI entry point used to call checkFeatureStatus() and throw the
+     * answer away, so on a phone without AICore — most phones — the failure
+     * surfaced from prepareInferenceEngine() as an inference error. The whole
+     * point of the availability API is that a caller can tell "never here" from
+     * "not yet", and that distinction was being discarded at the one place it
+     * is actually known.
+     */
+    private fun genAiStatusAllowsRun(status: Int, feature: String, promise: Promise): Boolean =
+        when (status) {
+            FeatureStatus.AVAILABLE -> true
+
+            // The model is not on the device but AICore can fetch it, which is
+            // what prepareInferenceEngine() below will trigger. Private mode
+            // forbids exactly that, so it gets the transient code.
+            FeatureStatus.DOWNLOADABLE -> !blockedByPrivateMode(promise, feature)
+
+            // A download is already running. Transient, and retrying later
+            // works — which is why this is not hardware-ineligible.
+            FeatureStatus.DOWNLOADING -> {
+                promise.reject(
+                    "GENAI_MODEL_DOWNLOADING",
+                    "AICore is still downloading the $feature model. Try again once it finishes."
+                )
+                false
+            }
+
+            else -> {
+                promise.reject(
+                    "GENAI_UNAVAILABLE",
+                    "This device cannot run ML Kit GenAI $feature (AICore reports status $status)."
+                )
+                false
+            }
+        }
 
     /**
      * close() on a GenAI client is best-effort teardown. A failure there must
