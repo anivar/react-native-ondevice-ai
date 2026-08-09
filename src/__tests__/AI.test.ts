@@ -130,7 +130,7 @@ import {
   translateText,
 } from '../index';
 
-describe('react-native-ondeviceai', () => {
+describe('react-native-ai-gateway', () => {
   test('exports a function-based API (no AI class)', () => {
     expect(typeof getDeviceCapabilities).toBe('function');
     expect(typeof analyzeText).toBe('function');

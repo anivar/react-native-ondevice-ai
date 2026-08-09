@@ -12,6 +12,6 @@
     "android": {
       "package": "net.anivar.ondeviceai.example"
     },
-    "plugins": ["react-native-ondeviceai"]
+    "plugins": ["react-native-ai-gateway"]
   }
 }

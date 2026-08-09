@@ -10,18 +10,20 @@ No JS runtime dependencies. MIT.
 ## Install
 
 ```bash
-npm install react-native-ondeviceai
+npm install react-native-ai-gateway
 ```
 
-The npm package name has no hyphen between "ondevice" and "ai" — a
-pre-existing, unrelated package reserves the hyphenated spelling and npm's
-name-similarity check blocks anything close to it. The repository and project
-name keep the hyphen; only the package you install differs.
+The npm package is `react-native-ai-gateway`; the source lives in this
+`react-native-ondevice-ai` repository. Every spelling of "on-device ai" close
+enough to describe what this package does collided with an existing,
+unrelated package on npm, so the published name differs from the project
+name. Nothing leaves the device — see below — the name is about unifying
+access to whatever AI the platform already has, not a network gateway.
 
 **Expo** — add the plugin and rebuild. It sets the SDK floors and the speech usage string for you:
 
 ```json
-{ "expo": { "plugins": ["react-native-ondeviceai"] } }
+{ "expo": { "plugins": ["react-native-ai-gateway"] } }
 ```
 
 **Bare React Native** — raise `ios/Podfile` to `platform :ios, '17.0'` and `minSdkVersion` to `26`, then `pod install`. Both floors are required, not advisory: [why](https://github.com/anivar/react-native-ondevice-ai/blob/main/docs/setup.md).
@@ -31,7 +33,7 @@ A development build, not Expo Go.
 ## Use it
 
 ```ts
-import { getDeviceCapabilities, analyzeText, summarize } from 'react-native-ondeviceai';
+import { getDeviceCapabilities, analyzeText, summarize } from 'react-native-ai-gateway';
 
 // Language ID and entities on every supported device, no model download.
 // Sentiment is iOS only — NaturalLanguage has it, ML Kit does not.

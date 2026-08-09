@@ -20,7 +20,7 @@ eligible device below iOS 26, `explainCall('generate')` returns reason
 `os-too-old` — that means the OS version, not a broken bridge.
 
 ```ts
-import { getDeviceCapabilities, explainCall, generateText } from 'react-native-ondeviceai';
+import { getDeviceCapabilities, explainCall, generateText } from 'react-native-ai-gateway';
 
 console.log((await getDeviceCapabilities()).availability.generate);
 console.log(await explainCall('generate'));

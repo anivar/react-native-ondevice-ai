@@ -166,29 +166,29 @@ jobs:
       # reported success. A build that does not include the library under test
       # proves nothing, so assert the Kotlin was actually compiled.
       #
-      # The Gradle module name below is react-native-ondeviceai — the npm
+      # The Gradle module name below is react-native-ai-gateway — the npm
       # package name from package.json, which is what autolinking uses to
       # name the project — and deliberately does not match this repo's own
-      # directory name (react-native-ondevice-ai), reserved on npm by an
-      # unrelated package.
+      # directory name (react-native-ondevice-ai). Every spelling close to
+      # "on-device ai" collided with an existing, unrelated npm package.
       - name: Assert the library was actually compiled
         if: always()
         run: |
-          if ! grep -qE 'Task :react-native-ondeviceai:compile.*Kotlin' /tmp/gradle.log; then
+          if ! grep -qE 'Task :react-native-ai-gateway:compile.*Kotlin' /tmp/gradle.log; then
             echo "::error::The host app built without compiling this library."
             echo "::error::Autolinking did not pick it up, so this run verified nothing."
             echo "Gradle tasks that did run:"
             grep -oE '> Task :[^ ]+' /tmp/gradle.log | sort -u
             exit 1
           fi
-          if grep -qE 'Task :react-native-ondeviceai:[^ ]+ FAILED' /tmp/gradle.log; then
+          if grep -qE 'Task :react-native-ai-gateway:[^ ]+ FAILED' /tmp/gradle.log; then
             echo "::error::A task belonging to this library failed:"
-            grep -oE '> Task :react-native-ondeviceai:[^ ]+ FAILED' /tmp/gradle.log | sort -u
+            grep -oE '> Task :react-native-ai-gateway:[^ ]+ FAILED' /tmp/gradle.log | sort -u
             grep -E '^e: ' /tmp/gradle.log | head -40
             exit 1
           fi
           echo "Library compiled:"
-          grep -oE '> Task :react-native-ondeviceai:[^ ]+' /tmp/gradle.log | sort -u
+          grep -oE '> Task :react-native-ai-gateway:[^ ]+' /tmp/gradle.log | sort -u
 
   # macOS runners are free for public repositories, so the Swift and ObjC++ can
   # at least be compiled. Compiling is not verifying: Foundation Models needs

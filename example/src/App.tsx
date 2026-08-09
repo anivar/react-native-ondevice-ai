@@ -30,7 +30,7 @@ import {
   isAIError,
   type SummarizeResult,
   summarize,
-} from 'react-native-ondeviceai';
+} from 'react-native-ai-gateway';
 import { dark, light, stateColor, type Theme } from './theme';
 import {
   type CheckGroup,
@@ -126,7 +126,7 @@ export default function App() {
           </View>
           <View>
             <Text style={s.brand}>on-device AI</Text>
-            <Text style={s.brandSub}>react-native-ondeviceai</Text>
+            <Text style={s.brandSub}>react-native-ai-gateway</Text>
           </View>
         </View>
 
@@ -297,7 +297,7 @@ export default function App() {
           </View>
         )}
 
-        <Text style={s.footer}>react-native-ondeviceai</Text>
+        <Text style={s.footer}>react-native-ai-gateway</Text>
       </ScrollView>
     </SafeAreaView>
   );
