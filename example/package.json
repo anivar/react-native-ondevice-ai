@@ -1,23 +1,26 @@
 {
-  "name": "@anivar/mobile-ai-toolkit-example",
+  "name": "react-native-ai-gateway-example",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "android": "react-native run-android",
-    "ios": "react-native run-ios",
-    "start": "react-native start",
+    "prebuild": "expo prebuild --clean",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "start": "expo start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^19.0.0",
-    "react-native": "^0.80.0",
-    "@anivar/mobile-ai-toolkit": "file:.."
+    "react-native": "^0.86.2",
+    "expo": "~55.0.0",
+    "react-native-ai-gateway": "file:.."
   },
   "devDependencies": {
-    "@react-native/babel-preset": "^0.80.0",
-    "@react-native/metro-config": "^0.80.0",
-    "@react-native/typescript-config": "^0.80.0",
+    "@react-native/babel-preset": "^0.86.2",
+    "@react-native/metro-config": "^0.86.2",
+    "@react-native/typescript-config": "^0.86.2",
     "@types/react": "^19.0.0",
     "typescript": "^6.0.3"
-  }
+  },
+  "main": "index.js"
 }

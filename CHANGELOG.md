@@ -1,35 +1,74 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+Notable changes, newest first. This project follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.1.0] - 2026-08-09
 
-## [2.1.0-rc.5] - 2026-04-27
+**First release.** On-device AI for React Native, built on the frameworks the
+phone already ships — Apple Vision, NaturalLanguage, Speech and Foundation
+Models on iOS, Google ML Kit on Android. Nothing leaves the device.
 
-### Fixed
-- Move `App.tsx` under `example/src/` triggered `biome check .` (which `prepublishOnly` runs) over a wider file set; rc.4's publish job failed on JSX formatting + a stray `'a' + b` concat. Reformatted via biome and dropped an unused `React` default import (RN 0.80 + React 19 use the new JSX transform).
+### What you get
 
-## [2.1.0-rc.4] - 2026-04-27
+**Text and vision, on every supported phone.** Language identification and
+entities through one `analyzeText` call, plus sentiment on iOS. OCR, barcodes,
+image labels, faces and person segmentation through `analyzeImage` and
+friends. No model download, no setup, no AICore for any of it — the one
+exception is entity extraction on Android, which downloads its model on first
+use and then works offline.
 
-### Added
-- Real RN scaffolding under `example/`: `package.json`, `metro.config.js` (with workspace resolver against the parent package), `babel.config.js`, `index.js`, `app.json`. `App.tsx` lives at `example/src/App.tsx`.
-- Root `typecheck` / `typecheck:example` scripts and a CI step that type-checks the example against the library source. The library typecheck is now part of CI on every push and PR.
+**Generative, where the phone can do it.** `summarizeText`, `rewriteText`,
+`generateText` and `chat`, routed to Apple Foundation Models on iOS 26 with
+Apple Intelligence and to ML Kit GenAI on AICore devices. `proofreadText` is
+generative on Android but a UITextChecker spelling pass on iOS, where it works
+unconditionally rather than needing Apple Intelligence. On Android, where most
+devices have no generative model, `summarizeText` falls back to a bundled
+extractive summariser that picks sentences rather than writing them, so it
+cannot invent a fact — and says so, with `degraded: true` and the route that
+produced the result. iOS defaults to an honest rejection instead of that
+fallback, since Apple ships a real summariser on eligible hardware; opt in
+with `configure({ ios: { tiers: ['on-device', 'local-deterministic'] } })` if
+you want it anyway.
 
-### Fixed
-- Android: removed the dangling `manifest.srcFile "src/main/AndroidManifestNew.xml"` override (the file did not exist; consumers on AGP 7.3+ would have hit a missing-manifest error). The namespace is still declared via `android.namespace`, and the package attribute on `AndroidManifest.xml` is dropped to avoid the AGP 7+ namespace/package conflict.
+**An honest answer about the device in front of you.** Most phones cannot run
+a generative model, so the interesting question is not what the API does but
+what this user's phone can. `availability` answers per feature, with a reason,
+straight from ML Kit's `checkFeatureStatus()` and Apple's
+`SystemLanguageModel.availability` — signals both platforms publish and most
+wrappers flatten into a boolean. The reason separates the permanent
+(`os-too-old`, `hardware-ineligible`, `no-platform-api`) from the temporary
+(`user-disabled`, `model-not-ready`), so you know whether to hide a button
+forever or offer it again in a minute — plus `unknown`, which is what Android
+returns when AICore cannot itself tell "never" from "not yet". `explainCall`
+gives the same answer as a sentence, without running anything.
 
-## [2.1.0-rc.3] - 2026-04-27
+**Platform differences stated, not papered over.** Embeddings and file
+transcription are iOS-only; translation, smart replies and image description
+are Android-only. A call a platform cannot serve rejects with a typed
+`AIError` naming the reason — never a polyfill, never a placeholder string.
 
-### Added
-- Podspec declares `FoundationModels` as a `weak_framework` so the package builds on Xcode versions where the framework is unavailable; runtime calls are still gated by `@available(iOS 26.0, *)` and `SystemLanguageModel.default.availability`.
-- `example/tsconfig.json` so the example app actually typechecks against the package's real exports (`getDeviceCapabilities`, `analyzeText`, `smartReplies`, `chat`, `enablePrivateMode`).
+**Private mode.** One switch that refuses any call which would fetch a model,
+so an offline-only build cannot reach the network by accident.
 
-### Changed
-- `example/App.tsx` rewritten against the real public API. The previous version called `AI.configure`/`AI.analyze`/`AI.smartReply`/`AI.chat` — none of which exist. It now consumes the actual `DeviceCapabilities` shape (`platform`, `osVersion`, `hasAppleIntelligence`, `hasGeminiNano`, `features.*`), the real `SmartReplyMessage` (`{ text, fromUser, timestampMs }`), and the real `ChatMessage` (`{ role, content }`).
-- iOS: `isPrivateModeEnabled` is now a `RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD` so the JS side gets a real boolean instead of a Promise that never resolved through the bridge.
-- Android: `transcribeAudioFile` rejects with `FILE_TRANSCRIPTION_UNSUPPORTED` instead of silently failing — stock `SpeechRecognizer` is microphone-only; file transcription needs OEM-specific APIs or a TFLite model.
-- Brand: README, podspec-adjacent native sources, and Android module carry the OpenSLM project mark.
+**Expo, first class.** A config plugin sets the Android `minSdkVersion`, the
+iOS deployment target and the speech usage string, raising each only when your
+project sits lower.
 
-### Fixed
-- Android: removed unused `Intent`, `Bundle`, `RecognitionListener`, `RecognizerIntent` imports.
+### How far it has been verified
+
+CI compiles every line of Kotlin, Swift and ObjC++ on each pull request inside
+a generated host app, and asserts this library was actually linked and that
+none of its build tasks failed. It runs nothing — no job executes a native
+path on a device or emulator. The native sources are also checked for
+networking symbols and the Android manifest for permissions beyond an
+allowlist.
+
+The generative routes additionally need hardware no CI runner has at all: an
+Apple Intelligence iPhone for Foundation Models, an AICore Android for ML Kit
+GenAI. The example app ships a screen that exercises most of the public API
+and produces a shareable report, and a report from one of those devices is
+worth more than most code changes right now.
+
+[0.1.0]: https://github.com/anivar/react-native-ai-gateway/releases/tag/v0.1.0

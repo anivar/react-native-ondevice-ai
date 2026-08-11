@@ -12,9 +12,9 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: "https://registry.npmjs.org"
@@ -27,13 +27,49 @@ jobs:
         run: |
           npm run lint
           npm test -- --ci
+          node scripts/check-no-network.mjs
+          node scripts/check-permissions.mjs
           npm run build
 
+      # The dist-tag below is derived from the tag name, but nothing checked
+      # that the tag matches the version being published. `git tag v2.1.0` on a
+      # tree reading 2.1.0-rc.5 would have shipped an RC to `latest`.
+      - name: Check the tag against package.json
+        env:
+          NPM_DIST_TAG: ${{ contains(github.ref_name, '-') && 'next' || 'latest' }}
+        run: node scripts/check-release.mjs "${GITHUB_REF_NAME}"
+
+      - name: Check package contents
+        run: npx --yes publint
+
+      # Trusted Publishing: npm authenticates this workflow by its OIDC identity
+      # (repository + workflow file), so there is no NPM_TOKEN to store, rotate
+      # or leak, and nothing expires. npm's own token screen recommends it over
+      # an automation token for exactly this use.
+      #
+      # `--provenance` is implied by trusted publishing, but stays explicit so
+      # the intent is readable: the attestation is what lets the README claim
+      # every release links back to the run that built it.
+      #
+      # Requires npm >= 11.5.1, which node 24 provides, and the `id-token: write`
+      # permission granted above.
       - name: Publish
-        # Prerelease tags (e.g. v2.1.0-rc.1) ship under the `next` dist-tag so
-        # default `npm install` keeps pulling the verified `latest`. Tags with
-        # no hyphen (v2.0.0, v2.1.0) become `latest` automatically.
+        # Prerelease tags (e.g. v2.3.0-rc.1) ship under the `next` dist-tag so a
+        # default `npm install` keeps pulling `latest`. Tags with no hyphen
+        # become `latest`.
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          npm --version
+          if [ -n "${NPM_TOKEN}" ]; then
+            echo "Authenticating with the stored NPM_TOKEN."
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+          else
+            echo "No NPM_TOKEN set - relying on Trusted Publishing (OIDC)."
+            echo "If this fails with E404 on PUT, npm had no credential: either the"
+            echo "trusted publisher is not registered for this package, or its fields"
+            echo "do not match this repository and workflow file exactly."
+          fi
           if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
             echo "Publishing prerelease ${GITHUB_REF_NAME} under dist-tag 'next'"
             npm publish --provenance --access public --tag next
@@ -41,5 +77,3 @@ jobs:
             echo "Publishing release ${GITHUB_REF_NAME} under dist-tag 'latest'"
             npm publish --provenance --access public
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

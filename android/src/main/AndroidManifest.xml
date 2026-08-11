@@ -1,8 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permissions for AI features -->
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!--
+      One permission, and only because two features genuinely need it.
+
+      ML Kit downloads a model on first use for translateText and
+      extractEntities. Both work offline afterwards, and enablePrivateMode(true)
+      refuses the download rather than performing it. No inference in this
+      library sends anything anywhere — see scripts/check-no-network.mjs, which
+      fails the build if a networking symbol appears in the native sources.
+
+      A library's permissions merge into every app that installs it and show up
+      in that app's store listing, so this file stays minimal on purpose.
+      CAMERA and RECORD_AUDIO used to be declared here and were never needed:
+      images arrive as base64 strings and transcribeAudioFile takes a file path
+      (and on Android rejects outright). Declaring them made every consuming app
+      look like it wanted the camera and microphone.
+    -->
     <uses-permission android:name="android.permission.INTERNET" />
 
 </manifest>
