@@ -1,248 +1,101 @@
-# @anivar/mobile-ai-toolkit
+# react-native-ai-gateway
 
-[![an OpenSLM project](https://img.shields.io/badge/an%20OpenSLM-project-0b1118?style=flat-square&labelColor=0b1118)](https://github.com/openslm-ai)
+**On-device AI for React Native.** Text, vision, speech and generative models, using the frameworks the phone already ships — Apple Vision, NaturalLanguage, Speech and Foundation Models on iOS, Google ML Kit on Android.
 
-> **On-device AI for React Native.** One unified TypeScript API; each method is a thin TurboModule binding to a documented platform framework — Apple Foundation Models / Vision / NaturalLanguage / Speech on iOS, Google ML Kit (incl. ML Kit GenAI on AICore-enabled devices) on Android. Nothing leaves the device, nothing is mocked.
+Nothing leaves the device. There is no cloud tier and no `fetch`, and CI fails the build if a networking symbol appears in the native sources at all.
 
-<p>
-  <a href="https://www.npmjs.com/package/@anivar/mobile-ai-toolkit"><img alt="npm (latest)" src="https://img.shields.io/npm/v/@anivar/mobile-ai-toolkit/latest.svg?style=flat-square&label=npm%20latest&color=cb3837&logo=npm"></a>
-  <a href="https://www.npmjs.com/package/@anivar/mobile-ai-toolkit?activeTab=versions"><img alt="npm (next)" src="https://img.shields.io/npm/v/@anivar/mobile-ai-toolkit/next.svg?style=flat-square&label=npm%20next&color=ff8800&logo=npm"></a>
-  <a href="https://www.npmjs.com/package/@anivar/mobile-ai-toolkit"><img alt="downloads" src="https://img.shields.io/npm/dm/@anivar/mobile-ai-toolkit.svg?style=flat-square&color=0aa"></a>
-  <a href="https://bundlephobia.com/package/@anivar/mobile-ai-toolkit"><img alt="bundle size" src="https://img.shields.io/bundlephobia/minzip/@anivar/mobile-ai-toolkit?style=flat-square&label=min%2Bgzip"></a>
-  <a href="https://packagephobia.com/result?p=@anivar/mobile-ai-toolkit"><img alt="install size" src="https://badgen.net/packagephobia/install/@anivar/mobile-ai-toolkit?style=flat-square"></a>
-</p>
-
-<p>
-  <a href="https://github.com/openslm-ai/mobile-ai-toolkit/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/openslm-ai/mobile-ai-toolkit/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white"></a>
-  <a href="https://github.com/openslm-ai/mobile-ai-toolkit/actions/workflows/release.yml"><img alt="Release" src="https://img.shields.io/github/actions/workflow/status/openslm-ai/mobile-ai-toolkit/release.yml?style=flat-square&label=release&logo=githubactions&logoColor=white"></a>
-  <a href="https://docs.npmjs.com/generating-provenance-statements"><img alt="npm provenance" src="https://img.shields.io/badge/npm-provenance-success?style=flat-square&logo=npm"></a>
-  <a href="https://github.com/openslm-ai/mobile-ai-toolkit/security/policy"><img alt="security policy" src="https://img.shields.io/badge/security-policy-informational?style=flat-square&logo=keybase"></a>
-  <a href="https://www.npmjs.com/package/@anivar/mobile-ai-toolkit"><img alt="types: included" src="https://img.shields.io/npm/types/@anivar/mobile-ai-toolkit?style=flat-square&logo=typescript&logoColor=white"></a>
-</p>
-
-<p>
-  <img alt="iOS 13+" src="https://img.shields.io/badge/iOS-13%2B-000?style=flat-square&logo=apple&logoColor=white">
-  <img alt="Android API 26+" src="https://img.shields.io/badge/Android-API%2026%2B-3DDC84?style=flat-square&logo=android&logoColor=white">
-  <img alt="React Native 0.80+" src="https://img.shields.io/badge/React%20Native-%E2%89%A50.80-61dafb?style=flat-square&logo=react">
-  <img alt="React 19+" src="https://img.shields.io/badge/React-%E2%89%A519-61dafb?style=flat-square&logo=react">
-  <img alt="New Architecture (TurboModule)" src="https://img.shields.io/badge/New%20Architecture-TurboModule-7c3aed?style=flat-square">
-  <img alt="On-device" src="https://img.shields.io/badge/runs-on--device-22c55e?style=flat-square">
-</p>
-
-<p>
-  <a href="https://github.com/openslm-ai/mobile-ai-toolkit/stargazers"><img alt="stars" src="https://img.shields.io/github/stars/openslm-ai/mobile-ai-toolkit?style=flat-square&logo=github"></a>
-  <a href="https://github.com/openslm-ai/mobile-ai-toolkit/issues"><img alt="open issues" src="https://img.shields.io/github/issues/openslm-ai/mobile-ai-toolkit?style=flat-square&logo=github"></a>
-  <a href="https://github.com/openslm-ai/mobile-ai-toolkit/pulls"><img alt="open PRs" src="https://img.shields.io/github/issues-pr/openslm-ai/mobile-ai-toolkit?style=flat-square&logo=github"></a>
-  <a href="https://github.com/openslm-ai/mobile-ai-toolkit/commits/main"><img alt="last commit" src="https://img.shields.io/github/last-commit/openslm-ai/mobile-ai-toolkit?style=flat-square&logo=github"></a>
-  <a href="https://github.com/sponsors/anivar"><img alt="sponsor" src="https://img.shields.io/github/sponsors/anivar?style=flat-square&logo=githubsponsors&color=ea4aaa"></a>
-  <a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square"></a>
-</p>
-
----
-
-> ## ⚠️ 2.1 Release-Candidate Disclaimer
->
-> **The iOS Foundation Models bridge in 2.1.x has not been verified on real Apple Intelligence hardware.** The maintainer does not currently have access to an iPhone 15 Pro / 16 / 17 series device, an Apple Developer account, or a paid macOS CI runner. The Swift code is written against publicly documented Apple API but has only been compile-checked on Linux via the JS / TypeScript / Biome surface — there is no proof the bridge runs end-to-end against the real `SystemLanguageModel`.
->
-> **What this means for you:**
-> - 2.1.0-rc.x ships under the `next` dist-tag, **not `latest`**. Default `npm install` still pulls the verified 2.0.
-> - On Android (ML Kit + ML Kit GenAI), 2.1 is functionally identical to 2.0 — same verified surface.
-> - On iOS ≤ 25, 2.1 behaves exactly like 2.0 (rejects generative methods).
-> - On iOS 26+ with Apple Intelligence enabled, the new `summarizeText` / `rewriteText` / `generateText` / `chat()` methods *should* route to Foundation Models. They have not been observed doing so on real hardware.
->
-> **Help wanted — see [Contributors needed](#contributors-needed-real-device-verification) below.** If you own an Apple-Intelligence-eligible device and want to help cut a verified 2.1.0 GA, even a single bug report would unblock the release.
-
-## Why
-
-A unified surface that hides the iOS/Android split *without* lying about it. Where one platform has a real API and the other doesn't, the call resolves on one side and rejects with `UNSUPPORTED_PLATFORM` / `FEATURE_UNAVAILABLE` on the other — never a polyfill, never a placeholder string. You probe `getDeviceCapabilities()` once, gate UI on the returned feature flags, and write the call site once.
+Needs iOS 17+, Android API 26+ and React Native 0.86+ on the New Architecture.
+No JS runtime dependencies. MIT.
 
 ## Install
 
-Stable (verified surface — recommended for production):
-
 ```bash
-npm install @anivar/mobile-ai-toolkit
-cd ios && pod install
+npm install react-native-ai-gateway
 ```
 
-Release candidate (Apple Foundation Models bridge — see disclaimer):
+Every spelling of "on-device ai" close enough to describe this package
+collided with an existing, unrelated npm package, which is where the name
+comes from. Nothing leaves the device — see below — this is about unifying
+access to whatever AI the platform already has, not a network gateway.
 
-```bash
-npm install @anivar/mobile-ai-toolkit@next
-cd ios && pod install
+**Expo** — add the plugin and rebuild. It sets the SDK floors and the speech usage string for you:
+
+```json
+{ "expo": { "plugins": ["react-native-ai-gateway"] } }
 ```
 
-Requires React Native 0.80+ (new architecture / TurboModules), React 19+. Minimum iOS 13, Android API 26.
+**Bare React Native** — raise `ios/Podfile` to `platform :ios, '17.0'` and `minSdkVersion` to `26`, then `pod install`. Both floors are required, not advisory: [why](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/setup.md).
 
-## Capability matrix
+A development build, not Expo Go.
 
-Every method below maps to a real platform call. ✅ = on-device. 🧪 = on-device but unverified on real hardware (see disclaimer). ⚠️ = on-device when supported by OEM/locale. ❌ = not implemented on that platform; the call rejects with `UNSUPPORTED_PLATFORM`.
-
-| Method | iOS | Android |
-|---|---|---|
-| `getDeviceCapabilities()` | ✅ — feature probe | ✅ — feature probe |
-| `analyzeText(text, opts)` | ✅ NaturalLanguage — sentiment + entities | ✅ ML Kit Language ID + Entity Extraction |
-| `extractEntities(text)` | ✅ `NLTagSchemeNameType` | ✅ ML Kit `EntityExtraction` |
-| `identifyLanguage(text)` | ✅ `NLLanguageRecognizer` | ✅ ML Kit `LanguageIdentification` |
-| `embedText(text)` | ✅ `NLContextualEmbedding` (iOS 17+) | ❌ |
-| `analyzeImage(b64, opts)` | ✅ Vision OCR + face rects + iOS 17 foreground mask | ✅ ML Kit text + objects + faces |
-| `scanBarcodes(b64)` | ✅ `VNDetectBarcodesRequest` | ✅ ML Kit `BarcodeScanning` |
-| `labelImage(b64)` | ✅ `VNClassifyImageRequest` | ✅ ML Kit `ImageLabeling` |
-| `describeImage(b64)` | ❌ | ✅ ML Kit GenAI `ImageDescription` *(Beta, AICore)* |
-| `segmentPerson(b64)` | ✅ `VNGeneratePersonSegmentationRequest` (iOS 15+) | ✅ ML Kit `SelfieSegmentation` |
-| `proofreadText(text)` | ✅ `UITextChecker` *(spelling only)* | ✅ ML Kit GenAI `Proofreader` *(Beta, AICore)* |
-| `summarizeText(text, fmt)` | 🧪 Foundation Models *(iOS 26+, Apple Intelligence — unverified, see disclaimer)* | ✅ ML Kit GenAI `Summarizer` *(Beta, AICore)* |
-| `rewriteText(text, style)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Rewriter` *(Beta, AICore)* |
-| `generateText(prompt, opts)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Prompt` API *(Beta, Gemini Nano / Gemma 4 via AICore)* |
-| `chat(messages, opts)` | 🧪 Foundation Models *(iOS 26+, unverified)* | ✅ ML Kit GenAI `Prompt` API (history flattened to single-shot prompt) |
-| `smartReplies(messages)` | ❌ — no public iOS equivalent | ✅ ML Kit `SmartReply` (GA) |
-| `translateText(text, src, tgt)` | ❌ — Translation framework bridge tracked for v2.2 | ✅ ML Kit `Translator` (GA, downloads language pack on first use) |
-| `transcribeAudioFile(path, opts)` | ✅ `SFSpeechRecognizer` with `requiresOnDeviceRecognition = true` | ⚠️ `SpeechRecognizer` with `EXTRA_PREFER_OFFLINE` (OEM-dependent) |
-
-`getDeviceCapabilities().features` returns a `Record<MethodName, boolean>` map so you can show or hide UI without try/catch.
-
-## Quick start
+## Use it
 
 ```ts
-import {
-  getDeviceCapabilities,
-  analyzeText,
-  analyzeImage,
-  scanBarcodes,
-  labelImage,
-  segmentPerson,
-  summarizeText,
-  rewriteText,
-  generateText,
-  chat,
-  smartReplies,
-  translateText,
-  transcribeAudioFile,
-} from '@anivar/mobile-ai-toolkit';
+import { getDeviceCapabilities, analyzeText, summarize } from 'react-native-ai-gateway';
 
-// 1. Probe once at startup, gate UI on the feature map.
-const caps = await getDeviceCapabilities();
-
-// 2. Universal text + image — works on every iOS/Android device.
-const analysis = await analyzeText('I really like this app', {
+// Language ID and entities on every supported device, no model download.
+// Sentiment is iOS only — NaturalLanguage has it, ML Kit does not.
+const { language, sentiment } = await analyzeText('I really like this app', {
   includeSentiment: true,
-  includeEntities: true,
 });
-// → { language: 'en', sentiment: 0.6, entities: [...], confidence: 0.9 }
 
-const img = await analyzeImage(base64png, { extractText: true, detectFaces: true });
-const codes = await scanBarcodes(base64png);
-const labels = await labelImage(base64png);
-const { maskBase64, width, height } = await segmentPerson(base64png);
-
-// 3. Generative — gate on the feature map.
-if (caps.features.summarize) {
-  const tldr = await summarizeText(longArticle, 'bullets');
+// Generative features are not on every phone. Ask before you offer them.
+const { availability } = await getDeviceCapabilities();
+if (availability.summarize.state === 'available') {
+  const { value, tier, degraded } = await summarize(longArticle);
 }
-if (caps.features.generate) {
-  const reply = await generateText('Write a polite decline.', { maxOutputTokens: 80 });
-}
-if (caps.features.chat) {
-  const answer = await chat([
-    { role: 'system', content: 'You are terse.' },
-    { role: 'user', content: 'Why is the sky blue?' },
-  ]);
-}
-
-// 4. Platform-specific calls reject cleanly when unsupported.
-try {
-  const replies = await smartReplies([
-    { text: 'Want to grab lunch?', fromUser: false, timestampMs: Date.now() },
-  ]);
-} catch (e) {
-  // iOS: { code: 'UNSUPPORTED_PLATFORM' }
-}
-
-// 5. On-device transcription.
-const t = await transcribeAudioFile('/path/to/clip.m4a', { locale: 'en-US' });
 ```
 
-### Privacy-mode flag
+## The part that makes this different
 
-A boolean stored in the native module. It does not enforce anything by itself — read it from your app code before triggering methods that fetch model assets (e.g. `translateText` downloads a language pack on first use, ML Kit GenAI APIs may pull a model via AICore).
+Most phones cannot run a generative model. Gemini Nano needs AICore and Apple Foundation Models needs an Apple-Intelligence device on iOS 26 — and even among AICore devices the coverage splits, with the Galaxy S25 family supporting `summarize` but not `generate`. AICore also updates its model through the system, so a device's answer changes without your app being touched. **So the interesting question is not what the API does, it is what your user's phone can do right now.**
+
+`availability` answers that per feature, with a reason:
 
 ```ts
-import { enablePrivateMode, isPrivateModeEnabled } from '@anivar/mobile-ai-toolkit';
-enablePrivateMode(true);
+availability.summarize
+// { state: 'downloadable', requiresNetwork: true,
+//   detail: 'AICore can download the model for this feature.' }
 ```
 
-## Device-class gotchas
+`state` is `available`, `downloadable`, `downloading` or `unavailable`. When it is `unavailable` it carries a `reason` — and the distinction that matters is permanence: `os-too-old`, `hardware-ineligible` and `no-platform-api` mean hide the button forever; `user-disabled` and `model-not-ready` may change without your app being updated. Android often reports `unknown` instead of `hardware-ineligible` — AICore's own status cannot tell "never will" from "still fetching its configuration", so this package does not claim more certainty than the platform gives it. Treat `unknown` as "not now", not "never".
 
-- **iOS Foundation Models** (`summarizeText`, `rewriteText`, `generateText`, `chat` on iOS) require iOS 26+ on Apple-Intelligence-eligible hardware (iPhone 15 Pro / Pro Max, every iPhone 16 / 17, M-series iPad / Mac) **and** Apple Intelligence enabled in Settings. On any other configuration these methods reject `FEATURE_UNAVAILABLE` with a precise reason from `SystemLanguageModel.availability`. **The bridge itself is unverified — see the disclaimer at the top.**
-- **ML Kit GenAI** (`summarizeText`, `rewriteText`, `proofreadText`, `describeImage`, `generateText`, `chat` on Android) runs only on AICore-enabled devices: Pixel 9+, Samsung S25+, and select 2024–2026 flagships from Xiaomi / OPPO / Honor with locked bootloaders. Pixel 10+ uses Gemma 4 via AICore. On unsupported devices these methods reject with `FEATURE_UNAVAILABLE` — always check `caps.features.<method>` first.
-- **iOS on-device speech** (`SFSpeechRecognizer.supportsOnDeviceRecognition`) returns true on most modern devices but can be false for locales whose speech model isn't installed.
-- **iOS proofread** uses `UITextChecker` and is spelling-only; the Apple Intelligence Writing Tools rewrite UI has no programmatic invocation API.
-- **iOS embeddings** require iOS 17+ and a model loaded for the script of the input (Latin / CJK / Cyrillic / etc.); unsupported scripts reject with `FEATURE_UNAVAILABLE`.
-- **`chat()` is single-shot.** Both platforms flatten the message list into one prompt and run a single inference pass — neither vendor exposes a stable persistent-session API across the bridge yet. State lives in *your* JS, not in the native module.
+This comes from ML Kit's `checkFeatureStatus()` and Apple's `SystemLanguageModel.availability` — signals both platforms publish and most wrappers throw away in favour of a boolean.
 
-## What's NOT in this package
+`explainCall('summarize')` gives the same answer as a sentence, without running anything.
 
-- **No streaming token callbacks.** Tracked for v2.2 on Android via the Prompt API streaming surface.
-- **No iOS translation.** Apple's Translation framework requires SwiftUI host integration; bridge tracked for v2.2.
-- **No iOS image description.** Apple's on-device foundation model is text-only; no public `describeImage` equivalent exists. Use `labelImage()` / `analyzeImage()` for visual data.
-- **No intent classification.** No public on-device intent-classifier API on either platform that beats a hardcoded keyword matcher.
-- **No iOS Writing Tools rewrite.** The system UI can be attached to a `UITextView`, but it has no programmatic API.
-- **No cloud fallback.** Out of scope; call your own backend from JS if you need it.
+## What runs where
 
-## Contributors needed (real-device verification)
+| | iOS | Android |
+|---|---|---|
+| Text: language ID, entities | ✅ | ✅ |
+| Sentiment | ✅ | ❌ |
+| Vision: OCR, barcodes, labels, faces, segmentation | ✅ | ✅ |
+| Embeddings | ✅ | ❌ |
+| Translate, smart replies, image description | ❌ | ✅ |
+| File transcription | ✅ | ❌ |
+| Proofread | ✅ (UITextChecker, always) | AICore, generative |
+| Summarize, rewrite, generate, chat | iOS 26 + Apple Intelligence | AICore devices |
 
-The 2.1 release-candidate ships an unverified Foundation Models bridge because the maintainer doesn't have access to the hardware to test it. **You can help cut a verified 2.1.0 GA in under 10 minutes if you own any of:**
+The two platforms genuinely differ, and this package does not pretend otherwise: a call that a platform cannot do rejects with a typed `AIError` naming the reason, never a polyfill or a placeholder string. Full table: [docs/capabilities.md](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/capabilities.md).
 
-- iPhone 15 Pro / 15 Pro Max
-- any iPhone 16 / 16 Plus / 16 Pro / 16 Pro Max
-- any iPhone 17 / 17 Pro / 17 Pro Max
-- M1+ iPad or any Apple-silicon Mac, on macOS 26+ with Apple Intelligence enabled
+On Android, where most devices have no generative model, `summarize()` falls back to a bundled extractive summariser that selects sentences and never composes new text, so it cannot invent anything — results carry `degraded: true` and the route that produced them. iOS defaults to an honest rejection instead of that fallback, since Apple ships a real summariser on eligible hardware and a silently worse result on everything else is not a favour; opt in with `configure({ ios: { tiers: ['on-device', 'local-deterministic'] } })` if you want it anyway.
 
-**What we need:**
+## Docs
 
-1. Install `@anivar/mobile-ai-toolkit@next` in any RN 0.80+ app on the device above.
-2. Confirm Apple Intelligence is enabled in **Settings → Apple Intelligence & Siri**.
-3. Run this snippet:
-   ```ts
-   import { getDeviceCapabilities, generateText, summarizeText, chat } from '@anivar/mobile-ai-toolkit';
-   const caps = await getDeviceCapabilities();
-   console.log('hasAppleIntelligence:', caps.hasAppleIntelligence);
-   console.log('features.generate:', caps.features.generate);
-   console.log(await generateText('Write a one-line haiku about TurboModules.', { maxOutputTokens: 60 }));
-   console.log(await summarizeText('React Native bridges JS to native code via TurboModules using JSI.', 'one-bullet'));
-   console.log(await chat([
-     { role: 'system', content: 'You are terse.' },
-     { role: 'user', content: 'Why is the sky blue?' },
-   ]));
-   ```
-4. Open an issue at <https://github.com/openslm-ai/mobile-ai-toolkit/issues> with the device model, iOS version, and the four output lines (or the full error stack if it threw).
+- [Setup](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/setup.md) — platform floors, Expo plugin, the one Android permission
+- [Capabilities](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/capabilities.md) — every method, and reading availability
+- [Guide](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/guide.md) — usage, private mode, device-class gotchas
+- [Provenance](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/provenance.md) — supply chain, citation
 
-That's it. Even a single confirmation flips 2.1 from RC to GA. Bug reports are equally valuable — if the bridge is wrong I'd rather know now than have it sit broken for months.
+## Status
 
-We also welcome:
+CI compiles every line of Kotlin, Swift and ObjC++ on each pull request, inside a generated host app, and asserts this library was actually linked and that none of its build tasks failed. It runs nothing — no job executes a native path on a device or emulator. The native sources are also checked for networking symbols, the Android manifest for permissions beyond an allowlist, and the podspec for agreement with the manifest it ships in.
 
-- **Anyone with a paid macOS CI minute budget** — adding a workflow that does `xcodebuild build -scheme MobileAIToolkitExample -destination "platform=iOS Simulator,OS=26.0"` would catch compile-time regressions on every PR.
-- **iOS / Swift devs** willing to review `ios/AIToolkitFoundationModels.swift` for correctness against the documented Foundation Models API.
-- **Android / ML Kit GenAI users** with a Pixel 9+ or S25+ — bug reports against the Beta APIs are useful too.
+The generative routes additionally need hardware no CI runner has at all: an Apple Intelligence iPhone for Foundation Models, an AICore Android for ML Kit GenAI. The example app has a screen that exercises the public API and produces a shareable report; if you own one of those devices, [that report is the most useful thing anyone can send](https://github.com/anivar/react-native-ai-gateway/blob/main/docs/contributing-hardware.md).
 
-## Roadmap
+## About
 
-- **v2.1.0 GA** — gated on at least one community confirmation that the Foundation Models bridge works end-to-end on real hardware. Until then, 2.1.x stays under the `next` dist-tag.
-- **v2.2** — Streaming variants of `generateText` / `summarizeText` / `rewriteText` / `chat` (token callbacks) on Android via the Prompt API streaming surface.
-- **v2.2** — Apple Translation framework bridge for `translateText` on iOS 18+ via SwiftUI host integration.
+This repository ships no model weights and no training data. On iOS everything comes from system frameworks that were already on the phone. On Android, the ML Kit base APIs are bundled dependencies — they add their own model assets to your APK, which is a real cost this package does not hide — and entity extraction and translation additionally download a language pack on first use.
 
-## Supply chain & provenance
-
-- Every release on npm is published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) — the `Provenance` badge on the npm page links to the exact GitHub Actions run that built and signed the tarball.
-- The package has zero runtime dependencies. `peerDependencies` are `react ≥19` and `react-native ≥0.80`.
-- Releases are tagged on GitHub and built by the [release workflow](.github/workflows/release.yml) — the workflow file is the single source of truth for what gets published.
-
-## About OpenSLM
-
-`mobile-ai-toolkit` is part of [OpenSLM](https://github.com/openslm-ai) — an open
-collection of on-device small-language-model and AI runtime tooling. If you find
-this useful, the [OpenSLM org](https://github.com/openslm-ai) has more.
-
-## License
-
-MIT © [Anivar Aravind](https://github.com/anivar) / [OpenSLM](https://github.com/openslm-ai)
+MIT © [Anivar Aravind](https://github.com/anivar)

@@ -1,6 +1,6 @@
-// mobile-ai-toolkit — an OpenSLM project. https://github.com/openslm-ai
+// react-native-ai-gateway — https://github.com/anivar/react-native-ai-gateway
 //
-// Apple Foundation Models bridge for mobile-ai-toolkit.
+// Apple Foundation Models bridge for react-native-ai-gateway.
 // Requires iOS 26+ on Apple-Intelligence-capable hardware (A17 Pro, M-series).
 // On older OS or unsupported hardware the Objective-C++ caller must guard with
 // @available and SystemLanguageModel.default.availability before invoking us.
@@ -30,6 +30,51 @@ public final class AIToolkitFoundationModels: NSObject {
     }
     #endif
     return false
+  }
+
+  /**
+   Availability as a state token rather than a Bool.
+
+   `.modelNotReady` is the case a Bool cannot carry: the device is eligible,
+   the user has Apple Intelligence on, and the model is still downloading. It
+   reported identically to "this iPhone will never do this", so a UI had no way
+   to show a spinner instead of hiding the feature.
+
+   Returns one of: available, downloading, unavailable.
+   */
+  @objc public class func availabilityState() -> String {
+    #if canImport(FoundationModels)
+    if #available(iOS 26.0, macOS 26.0, *) {
+      switch SystemLanguageModel.default.availability {
+      case .available: return "available"
+      case .unavailable(.modelNotReady): return "downloading"
+      default: return "unavailable"
+      }
+    }
+    #endif
+    return "unavailable"
+  }
+
+  /** The machine-readable reason, matching the UnavailableReason union in TS. */
+  @objc public class func availabilityReason() -> String {
+    #if canImport(FoundationModels)
+    if #available(iOS 26.0, macOS 26.0, *) {
+      switch SystemLanguageModel.default.availability {
+      case .available:
+        return ""
+      case .unavailable(.deviceNotEligible):
+        return "hardware-ineligible"
+      case .unavailable(.appleIntelligenceNotEnabled):
+        return "user-disabled"
+      case .unavailable(.modelNotReady):
+        return "model-not-ready"
+      default:
+        return "unknown"
+      }
+    }
+    #endif
+    // Reached on any SDK older than iOS 26, where the framework does not exist.
+    return "os-too-old"
   }
 
   @objc public class func unavailableReason() -> String {

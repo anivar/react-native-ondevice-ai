@@ -1,9 +1,8 @@
 {
-  "name": "@anivar/mobile-ai-toolkit",
-  "version": "2.1.0-rc.5",
-  "description": "On-device AI for React Native. Zero cloud costs. One unified API.",
+  "name": "react-native-ai-gateway",
+  "version": "0.1.0",
+  "description": "On-device AI for React Native: text, vision, speech and generative models via Apple Vision/NaturalLanguage/Speech/Foundation Models and Google ML Kit. Nothing leaves the device.",
   "main": "lib/index.js",
-  "module": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
     ".": {
@@ -11,18 +10,22 @@
       "import": "./lib/index.js",
       "require": "./lib/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./app.plugin.js": "./app.plugin.js"
   },
   "sideEffects": false,
   "files": [
     "lib/",
     "src/",
+    "!src/__tests__",
     "ios/",
     "android/",
+    "!android/build",
+    "app.plugin.js",
+    "react-native.config.js",
     "README.md",
-    "SETUP.md",
     "LICENSE",
-    "MobileAIToolkit.podspec"
+    "react-native-ai-gateway.podspec"
   ],
   "scripts": {
     "build": "tsc",
@@ -30,49 +33,57 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "typecheck:example": "tsc --noEmit -p example/tsconfig.json",
-    "lint": "biome check src/",
-    "lint:fix": "biome check --write src/",
-    "format": "biome format --write src/",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
     "check": "biome check .",
     "prepublishOnly": "npm run check && npm run build"
   },
   "keywords": [
-    "ai",
-    "mobile",
     "react-native",
-    "toolkit",
-    "machine-learning",
-    "openai",
-    "gemini",
-    "claude",
-    "llm",
-    "mobile-ai",
-    "artificial-intelligence",
-    "chat",
+    "on-device-ai",
+    "ondevice",
+    "offline-ai",
+    "local-ai",
+    "turbomodule",
+    "new-architecture",
+    "expo",
+    "ml-kit",
+    "gemini-nano",
+    "apple-intelligence",
+    "foundation-models",
+    "ocr",
     "vision",
-    "voice",
-    "text-analysis"
+    "speech-to-text",
+    "text-analysis",
+    "summarization",
+    "privacy",
+    "ios",
+    "android"
   ],
-  "author": "Anivar Aravind <anivar@openslm.ai>",
+  "author": "Anivar Aravind <anivar.aravind@gmail.com>",
   "license": "MIT",
-  "homepage": "https://openslm.ai",
+  "homepage": "https://github.com/anivar/react-native-ai-gateway#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/openslm-ai/mobile-ai-toolkit.git"
+    "url": "git+https://github.com/anivar/react-native-ai-gateway.git"
   },
   "bugs": {
-    "url": "https://github.com/openslm-ai/mobile-ai-toolkit/issues"
+    "url": "https://github.com/anivar/react-native-ai-gateway/issues"
   },
   "funding": "https://github.com/sponsors/anivar",
   "peerDependencies": {
     "react": ">=19.0.0",
-    "react-native": ">=0.80.0"
+    "react-native": ">=0.86.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
+    "@expo/config-plugins": "^54.0.0",
     "@types/jest": "^30.0.0",
     "@types/react": "^19.0.0",
     "jest": "^30.3.0",
+    "react": "^19.2.3",
+    "react-native": "0.86.2",
     "ts-jest": "^29.4.4",
     "typescript": "^6.0.3"
   },
@@ -88,7 +99,11 @@
     "type": "modules",
     "jsSrcsDir": "src/specs",
     "android": {
-      "javaPackageName": "com.openslm.mobileaitoolkit"
+      "javaPackageName": "com.anivar.ondeviceai"
     }
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "ws": "^7.5.11"
   }
 }

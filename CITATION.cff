@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+title: "react-native-ai-gateway: on-device AI for React Native"
+message: "If you reference this software, please cite it using this metadata."
+type: software
+authors:
+  - family-names: "Aravind"
+    given-names: "Anivar A"
+    orcid: "https://orcid.org/0009-0009-8995-0005"
+    website: "https://anivar.net"
+repository-code: "https://github.com/anivar/react-native-ai-gateway"
+url: "https://github.com/anivar/react-native-ai-gateway"
+license: MIT
+keywords:
+  - on-device AI
+  - small language models
+  - react-native
+  - turbomodule
+  - edge inference
+  - apple foundation models
+  - ml kit genai
+  - local-first
+abstract: >-
+  A React Native TurboModule binding to the on-device AI frameworks both mobile
+  platforms already ship: Apple Vision, NaturalLanguage, Speech and Foundation
+  Models on iOS, and Google ML Kit including ML Kit GenAI on Android. Inference
+  runs on the device; the package contains no network path, a property enforced
+  by a build gate rather than asserted.
+
+  Its distinguishing concern is honest availability. Both platforms expose
+  per-feature signals — ML Kit's checkFeatureStatus() and Apple's
+  SystemLanguageModel.availability — and both are commonly discarded in favour
+  of boolean capability flags that report whether classes were linked rather
+  than whether a device can run them. This package surfaces the platform signals
+  directly, with a reason and a permanence distinction, so an application can
+  tell "not yet" from "never here".
+
+  This release ships inference and routing code only: no weights, no training
+  data, no representational schema of its own. The models it binds to are
+  closed runtimes on proprietary hardware.

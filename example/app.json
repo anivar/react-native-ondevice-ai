@@ -1,4 +1,17 @@
 {
-  "name": "MobileAIToolkitExample",
-  "displayName": "Mobile AI Toolkit Example"
+  "expo": {
+    "name": "On-device AI Example",
+    "slug": "react-native-ai-gateway-example",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "net.anivar.ondeviceai.example",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "net.anivar.ondeviceai.example"
+    },
+    "plugins": ["react-native-ai-gateway"]
+  }
 }

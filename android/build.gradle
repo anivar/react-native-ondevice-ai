@@ -8,7 +8,7 @@ buildscript {
   }
 
   dependencies {
-    classpath 'com.android.tools.build:gradle:7.4.2'
+    classpath 'com.android.tools.build:gradle:8.12.0'
     // noinspection DifferentKotlinGradleVersion
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
   }
@@ -49,14 +49,14 @@ def supportsNamespace() {
 
 android {
   if (supportsNamespace()) {
-    namespace "com.openslm.mobileaitoolkit"
+    namespace "com.anivar.ondeviceai"
   }
 
-  compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
+  compileSdk getExtOrIntegerDefault('compileSdkVersion')
 
   defaultConfig {
-    minSdkVersion getExtOrIntegerDefault('minSdkVersion')
-    targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
+    minSdk getExtOrIntegerDefault('minSdkVersion')
+    targetSdk getExtOrIntegerDefault('targetSdkVersion')
 
   }
 
@@ -66,13 +66,20 @@ android {
     }
   }
 
-  lintOptions {
+  // `lintOptions` was removed in AGP 8.
+  lint {
     disable 'GradleCompatible'
   }
 
+  // 17, not 1.8: React Native 0.80 and AGP 8 both require a JDK 17 toolchain,
+  // and AGP 8 rejects 1.8 source compatibility outright.
   compileOptions {
-    sourceCompatibility JavaVersion.VERSION_1_8
-    targetCompatibility JavaVersion.VERSION_1_8
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+
+  kotlinOptions {
+    jvmTarget = "17"
   }
 
   sourceSets {
@@ -164,14 +171,28 @@ repositories {
   }
 }
 
-def kotlin_version = getExtOrDefault('kotlinVersion')
-
 dependencies {
   // For < 0.71, this will be from the local maven repo
   // For > 0.71, this will be replaced by `com.facebook.react:react-android:$version` by react gradle plugin
   //noinspection GradleDynamicVersion
   implementation 'com.facebook.react:react-native:+'
-  implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+
+  // No explicit kotlin-stdlib. The Kotlin plugin adds the stdlib matching the
+  // compiler the *app* resolves; naming a version here forced that version on
+  // the whole app instead, and a stdlib newer than the app's compiler breaks
+  // every other library in the build — react-native-safe-area-context first.
+
+  // The GenAI Prompt API is suspend-based, so the module needs a scope to call
+  // it from. Present transitively through genai-common, but named explicitly
+  // because the code depends on it directly.
+  implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
+
+  // ListenableFuture.await(). The four Task-shaped GenAI features are not
+  // Task-shaped at all — checkFeatureStatus(), prepareInferenceEngine() and
+  // runInference() all return Guava ListenableFuture, which has no
+  // addOnSuccessListener. This adds the suspend bridge without pulling in the
+  // whole of Guava, which kotlinx-coroutines-guava would.
+  implementation 'androidx.concurrent:concurrent-futures-ktx:1.2.0'
 
   // ML Kit base APIs (GA, work on all devices)
   implementation 'com.google.mlkit:text-recognition:16.0.1'
@@ -185,11 +206,29 @@ dependencies {
   implementation 'com.google.mlkit:image-labeling:17.0.9'
   implementation 'com.google.mlkit:segmentation-selfie:16.0.0-beta6'
 
-  // ML Kit GenAI APIs (Beta) - require AICore-enabled devices (Pixel 9+, S25+, Pixel 10+ for Gemma 4).
+  // ML Kit GenAI APIs (Beta). These need AICore, which serves Gemini Nano —
+  // not Gemma, which is a separate self-hosted model for MediaPipe/LiteRT.
+  // The four feature APIs below and the Prompt API do not cover the same
+  // devices: the Galaxy S25 family supports these four and not the Prompt API.
   // Methods that depend on these reject FEATURE_UNAVAILABLE on unsupported devices.
   implementation 'com.google.mlkit:genai-summarization:1.0.0-beta1'
   implementation 'com.google.mlkit:genai-rewriting:1.0.0-beta1'
   implementation 'com.google.mlkit:genai-proofreading:1.0.0-beta1'
   implementation 'com.google.mlkit:genai-image-description:1.0.0-beta1'
+  // beta2, not beta4, and this is a hard constraint rather than caution.
+  //
+  // beta3 and beta4 are compiled with Kotlin 2.3 and beta4 additionally pulls
+  // genai-schema:1.0.0-alpha1, also 2.3. React Native 0.86 compiles with Kotlin
+  // 2.1.20, which reads metadata up to 2.2.0, so every class in those artifacts
+  // fails with "Module was compiled with an incompatible version of Kotlin" and
+  // the consuming app does not build. Raising the app's Kotlin is not a fix
+  // available to a library: React Native's Gradle plugin resolves the compiler
+  // version itself, and setting ext.kotlinVersion in the app changed nothing.
+  //
+  // beta2 carries metadata 2.2.0 and depends on genai-common:1.0.0-beta3, also
+  // 2.2.0. The other four genai artifacts pull genai-common:1.0.0-beta1, so the
+  // build resolves beta3 for all of them and stays readable.
+  //
+  // Revisit when React Native ships Kotlin 2.3.
   implementation 'com.google.mlkit:genai-prompt:1.0.0-beta2'
 }

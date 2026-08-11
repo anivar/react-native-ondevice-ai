@@ -1,6 +1,67 @@
 import type { TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
 
+/**
+ * What a feature can do on this device *right now*.
+ *
+ * The distinction a boolean flag could not make is the one callers need:
+ * `downloadable` and `downloading` both mean the button should stay, with a
+ * spinner or a prompt, while `unavailable` means it should go.
+ */
+export type FeatureState = 'available' | 'downloadable' | 'downloading' | 'unavailable';
+
+/**
+ * Why a feature is unavailable.
+ *
+ * `os-too-old`, `hardware-ineligible` and `no-platform-api` are permanent on
+ * this device. `user-disabled` and `model-not-ready` can change without the app
+ * being updated. `not-linked` is a build problem, not a device one.
+ */
+export type UnavailableReason =
+  | 'os-too-old'
+  | 'hardware-ineligible'
+  | 'not-linked'
+  | 'user-disabled'
+  | 'model-not-ready'
+  | 'unsupported-language'
+  | 'no-platform-api'
+  | 'unknown';
+
+export interface FeatureAvailability {
+  state: FeatureState;
+  /** Set when state is `unavailable`. */
+  reason?: UnavailableReason;
+  /** Platform's own wording, for logs and bug reports. Do not parse it. */
+  detail?: string;
+  /** True when reaching `available` needs a network connection first. */
+  requiresNetwork?: boolean;
+}
+
+/**
+ * One field per feature rather than a map: TurboModule codegen cannot express
+ * `Record<string, T>` in a return type.
+ */
+export interface FeatureAvailabilityMap {
+  analyzeText: FeatureAvailability;
+  analyzeImage: FeatureAvailability;
+  proofread: FeatureAvailability;
+  summarize: FeatureAvailability;
+  rewrite: FeatureAvailability;
+  generate: FeatureAvailability;
+  chat: FeatureAvailability;
+  smartReplies: FeatureAvailability;
+  extractEntities: FeatureAvailability;
+  embedText: FeatureAvailability;
+  translate: FeatureAvailability;
+  transcribe: FeatureAvailability;
+  scanBarcodes: FeatureAvailability;
+  labelImage: FeatureAvailability;
+  describeImage: FeatureAvailability;
+  segmentPerson: FeatureAvailability;
+}
+
+export type FeatureName = keyof FeatureAvailabilityMap;
+
 export interface DeviceCapabilities {
   platform: 'ios' | 'android';
   osVersion: string;
@@ -10,24 +71,8 @@ export interface DeviceCapabilities {
   hasMLKitGenAI: boolean;
   hasOnDeviceSpeech: boolean;
   supportedLanguages: string[];
-  features: {
-    analyzeText: boolean;
-    analyzeImage: boolean;
-    proofread: boolean;
-    summarize: boolean;
-    rewrite: boolean;
-    generate: boolean;
-    chat: boolean;
-    smartReplies: boolean;
-    extractEntities: boolean;
-    embedText: boolean;
-    translate: boolean;
-    transcribe: boolean;
-    scanBarcodes: boolean;
-    labelImage: boolean;
-    describeImage: boolean;
-    segmentPerson: boolean;
-  };
+  /** Per-feature state with a reason. Gate UI on this. */
+  availability: FeatureAvailabilityMap;
 }
 
 export interface ChatMessage {
@@ -61,8 +106,15 @@ export interface Entity {
 export interface TextAnalysis {
   language: string;
   sentiment?: number;
+  /**
+   * Absent — not empty — when entity extraction was requested and failed.
+   * An empty array means the text genuinely had no entities; those two are
+   * different answers and used to be indistinguishable.
+   */
   entities?: Entity[];
   confidence: number;
+  /** True when part of the analysis failed and its field was omitted. */
+  degraded?: boolean;
 }
 
 export interface ImageAnalysisOptions {
@@ -81,6 +133,12 @@ export interface ImageAnalysis {
   faces: Array<{
     bounds: { x: number; y: number; width: number; height: number };
   }>;
+  /**
+   * True when one of the requested sub-analyses (text, objects, faces) failed.
+   * Its field is then empty for want of a result, not because the image had
+   * nothing in it.
+   */
+  degraded?: boolean;
 }
 
 export interface ProofreadResult {
@@ -166,4 +224,10 @@ export interface Spec extends TurboModule {
   isPrivateModeEnabled(): boolean;
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('AIToolkitTurboModule');
+/**
+ * `get`, not `getEnforcing`: the enforcing variant throws while this module is
+ * being imported, so on Expo Go, react-native-web or the old architecture the
+ * bundle dies rather than the feature. The null is handled once in `call.ts`,
+ * which raises MODULE_NOT_LINKED at call time instead.
+ */
+export default TurboModuleRegistry.get<Spec>('AIToolkitTurboModule');

@@ -9,9 +9,9 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: "npm"
@@ -31,8 +31,258 @@ jobs:
       - name: Test
         run: npm test -- --ci
 
+      # Cheap, and the only automated checks of what this package does to a
+      # consuming app: what it can reach, and what it makes that app ask for.
+      - name: No network in native sources
+        run: node scripts/check-no-network.mjs
+
+      - name: No unjustified Android permissions
+        run: node scripts/check-permissions.mjs
+
+      # Catches on Linux in a second what otherwise surfaces minutes into the
+      # macOS job — or not until a user runs pod install.
+      - name: Podspec agrees with the manifest
+        run: node scripts/check-podspec.mjs
+
       - name: Build
         run: npm run build
+
+  # The claim the config plugin makes is that an Expo project can install this
+  # and build. That is checkable without a device: prebuild generates the native
+  # projects, and the plugin's whole job is to leave minSdkVersion at 26, the
+  # iOS deployment target at 17, and the speech usage string in the Info.plist.
+  # Assert all three, because a plugin that silently no-ops looks identical to
+  # one that works until someone tries to build.
+  expo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the library
+        run: npm ci
+
+      - name: Build the library
+        run: npm run build
+
+      - name: Install the example
+        working-directory: example
+        run: npm install
+
+      - name: Prebuild
+        working-directory: example
+        run: npx expo prebuild --clean --no-install
+
+      # Expo does not write these into build.gradle or the Podfile directly:
+      # minSdkVersion lands in android/gradle.properties, and the Podfile reads
+      # its platform line from ios/Podfile.properties.json. Assert where the
+      # values actually live.
+      - name: Assert the plugin applied
+        working-directory: example
+        run: |
+          fail=0
+          if ! grep -q 'android.minSdkVersion=26' android/gradle.properties; then
+            echo "::error::minSdkVersion was not raised to 26; ML Kit GenAI fails the manifest merge."
+            cat android/gradle.properties
+            fail=1
+          fi
+          if ! grep -q '"ios.deploymentTarget": *"1[7-9]' ios/Podfile.properties.json; then
+            echo "::error::iOS deployment target was not raised to 17; pod install refuses to resolve."
+            cat ios/Podfile.properties.json
+            fail=1
+          fi
+          if ! grep -rq 'NSSpeechRecognitionUsageDescription' ios/; then
+            echo "::error::NSSpeechRecognitionUsageDescription missing; iOS terminates on the first speech request."
+            fail=1
+          fi
+          if [ $fail -eq 0 ]; then
+            echo "Config plugin applied:"
+            grep 'android.minSdkVersion' android/gradle.properties
+            grep 'ios.deploymentTarget' ios/Podfile.properties.json
+          fi
+          exit $fail
+
+  # Compiles the Kotlin. Until this job existed, none of the 800 lines in
+  # AIToolkitTurboModule.kt had ever been through a compiler.
+  #
+  # The host app is generated rather than committed: the library module cannot
+  # build alone (no wrapper in android/, and compileSdkVersion is read from
+  # rootProject.ext). Committing one is the better end state — it stops this
+  # job depending on the upstream template staying compatible — but generating
+  # it first proves the build works before ~30k lines of scaffolding land in
+  # the repo.
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: react-native-ai-gateway
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Generate host app
+        run: |
+          npx --yes @react-native-community/cli@latest init HostApp \
+            --version 0.86.2 --skip-install --skip-git-init --install-pods false
+
+      - name: Link the library into the host app
+        working-directory: HostApp
+        run: |
+          npm install
+          npm install ../react-native-ai-gateway
+
+      # The mirror of the iOS deployment-target step below. React Native 0.86's
+      # template ships minSdkVersion 24; ML Kit GenAI declares 26, and the
+      # manifest merger refuses to build the app without it. This is the exact
+      # step docs/setup.md asks a bare React Native developer to perform, and
+      # the one the Expo config plugin performs for them.
+      - name: Raise the host app's minSdkVersion
+        working-directory: HostApp/android
+        run: |
+          sed -i "s/minSdkVersion = 24/minSdkVersion = 26/" build.gradle
+          grep -n "minSdkVersion" build.gradle
+
+      # pipefail is not optional: without it the step exits with tee's status,
+      # so a FAILED compile reports success.
+      - name: Assemble
+        working-directory: HostApp/android
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace | tee /tmp/gradle.log
+
+      # The first green run of this job compiled nothing of ours: autolinking
+      # silently skipped the module, the host app built fine, and the job
+      # reported success. A build that does not include the library under test
+      # proves nothing, so assert the Kotlin was actually compiled.
+      #
+      # The Gradle module name below is derived from package.json's "name",
+      # which is what autolinking uses to name the project.
+      - name: Assert the library was actually compiled
+        if: always()
+        run: |
+          if ! grep -qE 'Task :react-native-ai-gateway:compile.*Kotlin' /tmp/gradle.log; then
+            echo "::error::The host app built without compiling this library."
+            echo "::error::Autolinking did not pick it up, so this run verified nothing."
+            echo "Gradle tasks that did run:"
+            grep -oE '> Task :[^ ]+' /tmp/gradle.log | sort -u
+            exit 1
+          fi
+          if grep -qE 'Task :react-native-ai-gateway:[^ ]+ FAILED' /tmp/gradle.log; then
+            echo "::error::A task belonging to this library failed:"
+            grep -oE '> Task :react-native-ai-gateway:[^ ]+ FAILED' /tmp/gradle.log | sort -u
+            grep -E '^e: ' /tmp/gradle.log | head -40
+            exit 1
+          fi
+          echo "Library compiled:"
+          grep -oE '> Task :react-native-ai-gateway:[^ ]+' /tmp/gradle.log | sort -u
+
+  # macOS runners are free for public repositories, so the Swift and ObjC++ can
+  # at least be compiled. Compiling is not verifying: Foundation Models needs
+  # Apple-Intelligence hardware no runner has, so its behaviour stays untested
+  # and the package stays on the `next` dist-tag until a real device confirms.
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: react-native-ai-gateway
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # No `pod lib lint`. It builds the pod in isolation, where React's headers
+      # do not exist, so a React Native TurboModule cannot pass it — the first
+      # run failed on `'React/RCTBridgeModule.h' file not found` before the real
+      # build could start. The meaningful check is compiling the pod inside a
+      # host app that has React in its Podfile, which is what this job does
+      # below. That covers everything the lint would have caught about the
+      # podspec: a bad dependency, a wrong deployment target, or a source_files
+      # glob that misses a file all fail `pod install` or the build.
+      - name: Generate host app
+        run: |
+          npx --yes @react-native-community/cli@latest init HostApp \
+            --version 0.86.2 --skip-install --skip-git-init --install-pods false
+
+      - name: Link the library into the host app
+        working-directory: HostApp
+        run: |
+          npm install
+          npm install ../react-native-ai-gateway
+
+      # A consuming app must raise its deployment target to match this pod.
+      # React Native 0.86's template ships 15.1, and CocoaPods refuses to
+      # resolve a pod that needs more, so this is the exact step a bare RN
+      # developer performs by hand and the Expo config plugin performs for them.
+      # Doing it here keeps CI honest about the setup the README documents.
+      - name: Raise the host app's iOS deployment target
+        working-directory: HostApp/ios
+        run: |
+          sed -i '' "s/platform :ios, min_ios_version_supported/platform :ios, '17.0'/" Podfile
+          grep -n "platform :ios" Podfile
+
+      - name: Pod install
+        working-directory: HostApp/ios
+        run: RCT_NEW_ARCH_ENABLED=1 pod install
+
+      # Against the header pod install just generated — the artifact the
+      # compiler itself consumes, so the check cannot drift from what is built.
+      # Eighteen of twenty methods once carried a selector the JSI layer never
+      # calls, and clang reported it only as a warning.
+      - name: iOS selectors match the generated TurboModule protocol
+        working-directory: react-native-ai-gateway
+        run: |
+          HEADER=$(find "$GITHUB_WORKSPACE/HostApp" -name 'AIToolkitTurboModuleSpec.h' -print -quit)
+          if [ -z "$HEADER" ]; then
+            echo "::error::pod install generated no AIToolkitTurboModuleSpec.h."
+            echo "::error::Codegen did not run for this module, so nothing was verified."
+            exit 1
+          fi
+          echo "Checking against $HEADER"
+          node scripts/check-ios-conformance.mjs "$HEADER"
+
+      # Raw output, not xcpretty: the first failing run reported only
+      # "CompileC ... AIToolkitTurboModule.mm" with every compiler diagnostic
+      # swallowed, which is useless for the one job whose whole purpose is to
+      # surface compiler errors. Keep the log and reprint the diagnostics.
+      - name: Build for simulator
+        working-directory: HostApp/ios
+        run: |
+          set -o pipefail
+          xcodebuild -workspace HostApp.xcworkspace -scheme HostApp \
+            -sdk iphonesimulator -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            build CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/xcodebuild.log || {
+              echo "::group::Compiler diagnostics"
+              grep -E '(error|warning):' /tmp/xcodebuild.log | sort -u || true
+              echo "::endgroup::"
+              exit 1
+            }
+
+      # A green iOS build proves nothing about the generative path if the
+      # compiler never saw it: `#if canImport(FoundationModels)` silently
+      # compiles to an empty branch on an SDK that lacks the framework. Assert
+      # the branch was actually taken.
+      - name: Assert FoundationModels was compiled, not skipped
+        working-directory: react-native-ai-gateway
+        run: |
+          if ! xcrun --sdk iphonesimulator --show-sdk-version | grep -qE '^(2[6-9]|[3-9][0-9])'; then
+            echo "::error::Runner SDK is older than iOS 26, so every"
+            echo "::error::canImport(FoundationModels) branch compiled to nothing."
+            echo "::error::This build did not check the generative code path."
+            exit 1
+          fi
 
   dependency-review:
     if: github.event_name == 'pull_request'
@@ -41,7 +291,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: high
