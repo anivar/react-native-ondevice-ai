@@ -104,6 +104,6 @@
   },
   "type": "commonjs",
   "dependencies": {
-    "ws": "^7.5.11"
+    "ws": "^8.21.3"
   }
 }
