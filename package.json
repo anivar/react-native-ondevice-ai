@@ -78,14 +78,14 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
-    "@expo/config-plugins": "^54.0.0",
+    "@expo/config-plugins": "^57.0.7",
     "@types/jest": "^30.0.0",
     "@types/react": "^19.0.0",
     "jest": "^30.3.0",
     "react": "^19.2.3",
-    "react-native": "0.86.2",
+    "react-native": "0.87.0",
     "ts-jest": "^29.4.4",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "publishConfig": {
     "access": "public"
